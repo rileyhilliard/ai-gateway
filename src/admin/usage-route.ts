@@ -35,6 +35,7 @@ const EmployeeUsageSchema = z.object({
   dailyAllowanceMicros: micros,
   overflow: OverflowPolicySchema,
   poolDrawsThisWeekMicros: micros,
+  spentThisWeekMicros: micros,
   blockedThisWeek: z.number().int(),
 });
 

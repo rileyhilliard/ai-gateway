@@ -10,6 +10,7 @@ import { nextDayStart, nextWeekStart, weekStart } from "../budget/periods.ts";
 import {
   blockedRequestsThisWeek,
   companySpendThisWeek,
+  employeeSpendThisWeek,
   personalSpendToday,
   poolDrawsThisWeek,
 } from "../budget/spend.ts";
@@ -33,6 +34,8 @@ export type EmployeeUsage = {
   /** The effective policy after the allowance; a pool cap of null means uncapped. */
   overflow: OverflowPolicy;
   poolDrawsThisWeekMicros: Micros;
+  /** What the employee cost this week, personal and pool together. */
+  spentThisWeekMicros: Micros;
   blockedThisWeek: number;
 };
 
@@ -116,6 +119,7 @@ function employeeUsage(employee: Employee, input: UsageReportInput): EmployeeUsa
     dailyAllowanceMicros: limits.dailyAllowanceMicros,
     overflow: limits.overflow,
     poolDrawsThisWeekMicros: poolDrawsThisWeek(usage, employee.id, now),
+    spentThisWeekMicros: employeeSpendThisWeek(usage, employee.id, now),
     blockedThisWeek: blockedRequestsThisWeek(usage, employee.id, now),
   };
 }

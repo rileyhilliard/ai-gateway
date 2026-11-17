@@ -1,5 +1,6 @@
 /**
- * The three spend sums the budget rules compare against limits. Only allowed records count;
+ * The spend sums the budget rules compare against limits, plus the per-employee weekly total
+ * the usage report shows. Only allowed records count;
  * blocked records have zero cost and never add to a sum.
  */
 
@@ -39,6 +40,15 @@ export function poolDrawsThisWeek(
     thisWeek(now),
     (record) => record.employeeId === employeeId && record.bucket === "pool",
   );
+}
+
+/** Everything one employee cost this week, from either bucket. */
+export function employeeSpendThisWeek(
+  records: readonly UsageRecord[],
+  employeeId: string,
+  now: Date,
+): Micros {
+  return sumAllowedCostsIn(records, thisWeek(now), (record) => record.employeeId === employeeId);
 }
 
 /** How many of one employee's requests were blocked this week. */

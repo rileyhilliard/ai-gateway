@@ -79,6 +79,7 @@ describe("employee rows", () => {
       dailyAllowanceMicros: usd(0.5),
       overflow: { kind: "pool", weeklyCapMicros: usd(2) },
       poolDrawsThisWeekMicros: 0,
+      spentThisWeekMicros: 0,
       blockedThisWeek: 0,
     });
   });
@@ -95,6 +96,17 @@ describe("employee rows", () => {
       spentTodayMicros: usd(0.3),
       poolDrawsThisWeekMicros: usd(0.9),
     });
+  });
+
+  it("totals each employee's spend this week from both buckets, for what they cost", () => {
+    const report = reportFor([
+      makeRecord({ costMicros: usd(0.4), bucket: "personal", startedAt: YESTERDAY }),
+      makeRecord({ costMicros: usd(0.3), bucket: "personal" }),
+      makeRecord({ costMicros: usd(0.7), bucket: "pool" }),
+      makeRecord({ costMicros: usd(9), bucket: "pool", startedAt: LAST_SUNDAY }),
+      makeRecord({ employeeId: "bob", costMicros: usd(0.1), bucket: "personal" }),
+    ]);
+    expect(report.employees.map((row) => row.spentThisWeekMicros)).toEqual([usd(1.4), usd(0.1)]);
   });
 
   it("counts this week's blocked requests per employee, not last week's", () => {

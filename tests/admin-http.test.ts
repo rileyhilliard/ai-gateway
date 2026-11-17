@@ -89,6 +89,7 @@ describe("GET /admin/usage", () => {
       dailyAllowanceMicros: 10_000,
       overflow: { kind: "pool", weeklyCapMicros: 20_000 },
       poolDrawsThisWeekMicros: 22_000,
+      spentThisWeekMicros: 33_000,
       blockedThisWeek: 1,
     });
     expect(ivy).toMatchObject({
