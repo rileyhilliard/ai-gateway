@@ -15,5 +15,30 @@ export type StoreContents = {
 
 /** A Store holding `contents` in memory. Reads return copies, so callers can't change state. */
 export function createMemoryStore(contents: StoreContents): Store {
-  throw new Error("not implemented");
+  // Copy on the way in as well, so the caller's arrays can't change stored state either.
+  const company = structuredClone(contents.company);
+  const tiers = structuredClone(contents.tiers);
+  const employees = structuredClone(contents.employees);
+  const usage = structuredClone(contents.usage ?? []);
+
+  return {
+    async getCompany() {
+      return structuredClone(company);
+    },
+    async getTier(id) {
+      return structuredClone(tiers.find((tier) => tier.id === id));
+    },
+    async findEmployeeByKey(apiKey) {
+      return structuredClone(employees.find((employee) => employee.apiKey === apiKey));
+    },
+    async listUsageSince(companyId, since) {
+      const matching = usage.filter(
+        (record) => record.companyId === companyId && record.startedAt >= since,
+      );
+      return structuredClone(matching);
+    },
+    async addUsage(record) {
+      usage.push(structuredClone(record));
+    },
+  };
 }

@@ -1,0 +1,29 @@
+{
+  "company": { "id": "acme", "name": "Acme", "weeklyPoolUsd": 1 },
+  "tiers": [
+    {
+      "id": "intern",
+      "name": "Intern",
+      "dailyAllowanceUsd": 0.01,
+      "overflow": { "kind": "block" }
+    },
+    {
+      "id": "engineer",
+      "name": "Engineer",
+      "dailyAllowanceUsd": 0.01,
+      "overflow": { "kind": "pool", "weeklyCapUsd": 0.02 }
+    },
+    {
+      "id": "staff",
+      "name": "Staff",
+      "dailyAllowanceUsd": 0.05,
+      "overflow": { "kind": "pool", "weeklyCapUsd": null }
+    }
+  ],
+  "employees": [
+    { "id": "ivy", "name": "Ivy", "tierId": "intern", "apiKey": "key-intern" },
+    { "id": "eli", "name": "Eli", "tierId": "engineer", "apiKey": "key-engineer" },
+    { "id": "sam", "name": "Sam", "tierId": "staff", "apiKey": "key-staff" },
+    { "id": "dee", "name": "Dee", "tierId": "intern", "apiKey": "key-disabled", "disabled": true }
+  ]
+}
