@@ -32,7 +32,7 @@ content-type: application/json
 
 { "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
 
-### Intern again. Expect 429 budget_exceeded, reason personal_allowance_exhausted, resets next 00:00 UTC.
+### Intern again. Expect 429 rate_limit_error (code budget_exceeded), reason personal_allowance_exhausted, resets next 00:00 UTC.
 # @name internBlocked
 POST {{baseUrl}}/v1/messages
 x-api-key: {{internKey}}
@@ -68,7 +68,7 @@ content-type: application/json
 
 { "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
 
-### Engineer a fourth time. Expect 429, reason pool_cap_reached, resets next 00:00 UTC when the allowance refills.
+### Engineer a fourth time. Expect 429 rate_limit_error (code budget_exceeded), reason pool_cap_reached, resets next 00:00 UTC when the allowance refills.
 # @name engineerCapped
 POST {{baseUrl}}/v1/messages
 x-api-key: {{engineerKey}}
@@ -77,14 +77,14 @@ content-type: application/json
 
 { "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
 
-### No key. Expect 401 unauthorized.
+### No key. Expect 401 authentication_error (code unauthorized).
 # @name noKey
 POST {{baseUrl}}/v1/messages
 content-type: application/json
 
 { "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
 
-### Disabled employee. Expect 401 unauthorized, the same as an unknown key.
+### Disabled employee. Expect 401 authentication_error (code unauthorized), the same as an unknown key.
 # @name disabledKey
 POST {{baseUrl}}/v1/messages
 x-api-key: {{disabledKey}}
@@ -92,7 +92,7 @@ content-type: application/json
 
 { "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
 
-### A model the gateway has no price for. Expect 400 unknown_model; nothing is forwarded.
+### A model the gateway has no price for. Expect 400 invalid_request_error (code unknown_model); nothing is forwarded.
 # @name unknownModel
 POST {{baseUrl}}/v1/messages
 x-api-key: {{staffKey}}
@@ -100,7 +100,7 @@ content-type: application/json
 
 { "model": "openai/gpt-unknown", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
 
-### No model at all. Expect 400 bad_request with an issue at json.model.
+### No model at all. Expect 400 invalid_request_error (code bad_request) with an issue at json.model.
 # @name missingModel
 POST {{baseUrl}}/v1/messages
 x-api-key: {{staffKey}}

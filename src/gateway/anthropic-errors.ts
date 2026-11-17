@@ -43,14 +43,36 @@ export const AnthropicErrorBody = z
 
 export type AnthropicErrorBody = z.infer<typeof AnthropicErrorBody>;
 
+const ANTHROPIC_TYPE_BY_CODE: Record<ErrorCode, AnthropicErrorType> = {
+  bad_request: "invalid_request_error",
+  unknown_model: "invalid_request_error",
+  unsupported_media_type: "invalid_request_error",
+  unauthorized: "authentication_error",
+  not_found: "not_found_error",
+  payload_too_large: "request_too_large",
+  budget_exceeded: "rate_limit_error",
+  internal: "api_error",
+  upstream_unavailable: "api_error",
+};
+
 /** The Anthropic error type a client should see for one of the gateway's error codes. */
 export function anthropicErrorType(code: ErrorCode): AnthropicErrorType {
-  throw new Error("not implemented");
+  return ANTHROPIC_TYPE_BY_CODE[code];
 }
 
 /** Renders an AppError as the `/v1/*` error body. */
 export function toAnthropicError(error: AppError, requestId: string): AnthropicErrorBody {
-  throw new Error("not implemented");
+  return {
+    type: "error",
+    error: {
+      type: anthropicErrorType(error.code),
+      message: error.message,
+      code: error.code,
+      ...(error.issues ? { issues: error.issues } : {}),
+      ...(error.budget ? { budget: error.budget } : {}),
+    },
+    request_id: requestId,
+  };
 }
 
 /** The OpenAPI response entry for an error status on a `/v1/*` route. */

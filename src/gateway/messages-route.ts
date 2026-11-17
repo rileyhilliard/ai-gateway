@@ -7,8 +7,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
 import type { Employee } from "../budget/types.ts";
-import { errorResponse } from "../errors.ts";
 import { createRouter } from "../router.ts";
+import { anthropicErrorResponse } from "./anthropic-errors.ts";
 import { authenticate } from "./authenticate.ts";
 import { type GatewayDeps, handleMessage } from "./service.ts";
 
@@ -37,10 +37,10 @@ export function messagesRoutes(deps: GatewayDeps) {
       // No content schema: the body is whatever the provider sent, error statuses included. Leaving
       // it out also lets the handler return the provider's response as a plain Response.
       200: { description: "The provider's response, passed through unchanged" },
-      400: errorResponse("Invalid body or a model the gateway doesn't accept"),
-      401: errorResponse("Missing, unknown or revoked key, or a disabled employee"),
-      429: errorResponse("A budget limit blocked the request"),
-      502: errorResponse("The inference provider couldn't be reached"),
+      400: anthropicErrorResponse("Invalid body or a model the gateway doesn't accept"),
+      401: anthropicErrorResponse("Missing, unknown or revoked key, or a disabled employee"),
+      429: anthropicErrorResponse("A budget limit blocked the request"),
+      502: anthropicErrorResponse("The inference provider couldn't be reached"),
     },
   });
 
