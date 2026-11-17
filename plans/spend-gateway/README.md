@@ -17,7 +17,7 @@ Product spec: [problem-statement.md](../../problem-statement.md). Build spec, er
 | [1](phase-1-gateway-budgets.md) | The gateway enforces tier budgets (MVP), with real inference through OpenRouter | none | done (`phase-1`) | |
 | [2](phase-2-usage-view.md) | Admins see spend per employee | 1 | done (`phase-2`) | |
 | [3](phase-3-admin-controls.md) | Admins change budgets and keys, with a demo clock | 2 | done (`phase-3`) | |
-| [4](phase-4-anthropic-errors.md) | Anthropic-shaped errors for real clients | 1 | planned | |
+| [4](phase-4-anthropic-errors.md) | Anthropic-shaped errors for real clients | 1 | in progress (`build/spend-gateway-p4`) | |
 | [5](phase-5-streaming.md) | Streaming, so Claude Code works through the gateway | 4 | planned | |
 | [6](phase-6-percent-of-pool.md) | Percent-of-pool allowances | 3 | planned | |
 | [7](phase-7-project-tags.md) | Project tags and spend by project | 2 | planned | |
