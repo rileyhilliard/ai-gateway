@@ -10,5 +10,16 @@ export type EffectiveLimits = { dailyAllowanceMicros: Micros; overflow: Overflow
 
 /** Applies `overrides` to `tier`. A pool-cap override on a block tier has no effect. */
 export function effectiveLimits(tier: Tier, overrides: Overrides): EffectiveLimits {
-  throw new Error("not implemented");
+  return {
+    dailyAllowanceMicros: overrides.dailyAllowanceMicros ?? tier.dailyAllowanceMicros,
+    overflow: overflowWithCapOverride(tier.overflow, overrides),
+  };
+}
+
+/** The tier's overflow policy, with the pool-cap override applied when the tier draws from the pool. */
+function overflowWithCapOverride(overflow: OverflowPolicy, overrides: Overrides): OverflowPolicy {
+  if (overflow.kind === "block") return overflow;
+  // null is a real override meaning "uncapped", so only a missing field keeps the tier's cap.
+  if (overrides.poolCapMicros === undefined) return overflow;
+  return { kind: "pool", weeklyCapMicros: overrides.poolCapMicros };
 }

@@ -3,7 +3,18 @@
  * employee's daily allowance, then their overflow policy. Pure: it reads only its input.
  */
 
-import type { Company, Decision, Employee, Tier, UsageRecord } from "./types.ts";
+import { effectiveLimits } from "./limits.ts";
+import { nextDayStart, nextWeekStart } from "./periods.ts";
+import { companySpendThisWeek, personalSpendToday, poolDrawsThisWeek } from "./spend.ts";
+import type {
+  BlockDecision,
+  Company,
+  Decision,
+  Employee,
+  Micros,
+  Tier,
+  UsageRecord,
+} from "./types.ts";
 
 /** Everything the budget rules need for one request. */
 export type DecisionInput = {
@@ -17,5 +28,59 @@ export type DecisionInput = {
 
 /** Allows the request from a bucket, or blocks it with the reason, amounts and reset time. */
 export function decide(input: DecisionInput): Decision {
-  throw new Error("not implemented");
+  const { company, tier, employee, usage, now } = input;
+
+  const companySpend = companySpendThisWeek(usage, company.id, now);
+  if (companySpend >= company.weeklyPoolMicros) {
+    return {
+      kind: "block",
+      reason: "company_pool_exhausted",
+      spentMicros: companySpend,
+      limitMicros: company.weeklyPoolMicros,
+      resetsAt: nextWeekStart(now),
+    };
+  }
+
+  const limits = effectiveLimits(tier, employee.overrides);
+  const personalSpend = personalSpendToday(usage, employee.id, now);
+  if (personalSpend < limits.dailyAllowanceMicros) {
+    return { kind: "allow", bucket: "personal" };
+  }
+
+  if (limits.overflow.kind === "block") {
+    return {
+      kind: "block",
+      reason: "personal_allowance_exhausted",
+      spentMicros: personalSpend,
+      limitMicros: limits.dailyAllowanceMicros,
+      resetsAt: nextDayStart(now),
+    };
+  }
+
+  const poolCap = limits.overflow.weeklyCapMicros;
+  const poolDraws = poolDrawsThisWeek(usage, employee.id, now);
+  if (poolCap === null || poolDraws < poolCap) {
+    return { kind: "allow", bucket: "pool" };
+  }
+
+  return poolCapBlock(poolDraws, poolCap, limits.dailyAllowanceMicros, now);
+}
+
+/** The block for an employee whose daily allowance and weekly pool cap are both used up. */
+function poolCapBlock(
+  poolDraws: Micros,
+  poolCap: Micros,
+  dailyAllowance: Micros,
+  now: Date,
+): BlockDecision {
+  // With an allowance, tomorrow's fresh allowance unblocks them. With none, only the weekly
+  // pool-cap reset does.
+  const resetsAt = dailyAllowance > 0 ? nextDayStart(now) : nextWeekStart(now);
+  return {
+    kind: "block",
+    reason: "pool_cap_reached",
+    spentMicros: poolDraws,
+    limitMicros: poolCap,
+    resetsAt,
+  };
 }

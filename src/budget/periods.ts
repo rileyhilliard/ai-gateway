@@ -3,22 +3,33 @@
  * week starts Monday 00:00 UTC. An instant exactly on a boundary belongs to the new period.
  */
 
+const DAYS_PER_WEEK = 7;
+
 /** 00:00 UTC on the day containing `at`. */
 export function dayStart(at: Date): Date {
-  throw new Error("not implemented");
+  return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
 }
 
 /** 00:00 UTC on the day after the one containing `at`. */
 export function nextDayStart(at: Date): Date {
-  throw new Error("not implemented");
+  return addUtcDays(dayStart(at), 1);
 }
 
 /** Monday 00:00 UTC of the week containing `at`. */
 export function weekStart(at: Date): Date {
-  throw new Error("not implemented");
+  // getUTCDay counts from Sunday (0); shifting by 6 makes Monday 0 and Sunday 6.
+  const daysSinceMonday = (at.getUTCDay() + 6) % DAYS_PER_WEEK;
+  return addUtcDays(dayStart(at), -daysSinceMonday);
 }
 
 /** Monday 00:00 UTC of the week after the one containing `at`. */
 export function nextWeekStart(at: Date): Date {
-  throw new Error("not implemented");
+  return addUtcDays(weekStart(at), DAYS_PER_WEEK);
+}
+
+/** The UTC midnight `days` calendar days from `midnight`. Date.UTC rolls over months and years. */
+function addUtcDays(midnight: Date, days: number): Date {
+  return new Date(
+    Date.UTC(midnight.getUTCFullYear(), midnight.getUTCMonth(), midnight.getUTCDate() + days),
+  );
 }
