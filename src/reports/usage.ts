@@ -1,12 +1,12 @@
 /**
  * The usage view: for every employee, today's personal spend against their allowance, this
  * week's pool draws against their cap, and this week's blocked requests, plus company spend
- * against the weekly pool. Pure: it reads only its input, and reuses the budget module's sums
+ * against the weekly pool and this week's spend per project tag. Pure: it reads only its input, and reuses the budget module's sums
  * and limits so the view always agrees with the decisions the gateway made.
  */
 
 import { effectiveLimits } from "../budget/limits.ts";
-import { nextDayStart, nextWeekStart } from "../budget/periods.ts";
+import { nextDayStart, nextWeekStart, weekStart } from "../budget/periods.ts";
 import {
   blockedRequestsThisWeek,
   companySpendThisWeek,
@@ -51,6 +51,19 @@ export type UsageReport = {
   };
   /** One row per employee, disabled ones included, in the order given. */
   employees: EmployeeUsage[];
+  /** One row per project tag seen this week, highest spend first, untagged last on ties. */
+  projects: ProjectUsage[];
+};
+
+/** One project's line in the usage view: this week's records that carried its tag. */
+export type ProjectUsage = {
+  /** The `x-project` tag, or null for requests sent without one. */
+  projectTag: string | null;
+  /** Cost of this week's allowed requests; blocked ones cost nothing. */
+  spentThisWeekMicros: Micros;
+  /** This week's allowed requests. */
+  requests: number;
+  blockedRequests: number;
 };
 
 /** Everything the usage view is computed from. */
@@ -81,6 +94,7 @@ export function usageReport(input: UsageReportInput): UsageReport {
       weeklyPoolMicros: company.weeklyPoolMicros,
     },
     employees: employees.map((employee) => employeeUsage(employee, input)),
+    projects: projectUsage(usage, company.id, now),
   };
 }
 
@@ -104,6 +118,47 @@ function employeeUsage(employee: Employee, input: UsageReportInput): EmployeeUsa
     poolDrawsThisWeekMicros: poolDrawsThisWeek(usage, employee.id, now),
     blockedThisWeek: blockedRequestsThisWeek(usage, employee.id, now),
   };
+}
+
+/** This week's records for the company, grouped by project tag and sorted for display. */
+function projectUsage(usage: readonly UsageRecord[], companyId: string, now: Date): ProjectUsage[] {
+  // The same week bounds as the company total, so project spend adds up to it.
+  const start = weekStart(now);
+  const end = nextWeekStart(now);
+  const rowsByTag = new Map<string | null, ProjectUsage>();
+  for (const record of usage) {
+    if (record.companyId !== companyId) continue;
+    if (record.startedAt < start || record.startedAt >= end) continue;
+    const row = rowsByTag.get(record.projectTag) ?? emptyProjectRow(record.projectTag);
+    rowsByTag.set(record.projectTag, addRecord(row, record));
+  }
+  return [...rowsByTag.values()].sort(bySpendThenTag);
+}
+
+function emptyProjectRow(projectTag: string | null): ProjectUsage {
+  return { projectTag, spentThisWeekMicros: 0, requests: 0, blockedRequests: 0 };
+}
+
+function addRecord(row: ProjectUsage, record: UsageRecord): ProjectUsage {
+  if (record.status === "blocked") {
+    return { ...row, blockedRequests: row.blockedRequests + 1 };
+  }
+  return {
+    ...row,
+    spentThisWeekMicros: row.spentThisWeekMicros + record.costMicros,
+    requests: row.requests + 1,
+  };
+}
+
+/** Highest spend first; ties by tag in code-point order so the list is stable, untagged last. */
+function bySpendThenTag(a: ProjectUsage, b: ProjectUsage): number {
+  if (a.spentThisWeekMicros !== b.spentThisWeekMicros) {
+    return b.spentThisWeekMicros - a.spentThisWeekMicros;
+  }
+  if (a.projectTag === b.projectTag) return 0;
+  if (a.projectTag === null) return 1;
+  if (b.projectTag === null) return -1;
+  return a.projectTag < b.projectTag ? -1 : 1;
 }
 
 /**

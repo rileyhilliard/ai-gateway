@@ -134,3 +134,69 @@ describe("employee rows", () => {
     expect(() => reportFor([], [lost])).toThrow(/ghost/);
   });
 });
+
+describe("project rows", () => {
+  const tagged = (projectTag: string | null, dollars: number, startedAt = NOW) =>
+    makeRecord({ projectTag, costMicros: usd(dollars), startedAt });
+  const blockedFor = (projectTag: string | null) =>
+    makeRecord({
+      projectTag,
+      status: "blocked",
+      bucket: null,
+      blockReason: "personal_allowance_exhausted",
+    });
+
+  it("sums this week's allowed spend per project, with untagged spend under null", () => {
+    const report = reportFor([
+      tagged("apollo", 1),
+      tagged("apollo", 0.5, YESTERDAY),
+      makeRecord({ projectTag: "apollo", bucket: "pool", costMicros: usd(0.25) }),
+      tagged(null, 0.2),
+      tagged("zeus", 2),
+    ]);
+    expect(report.projects).toEqual([
+      { projectTag: "zeus", spentThisWeekMicros: usd(2), requests: 1, blockedRequests: 0 },
+      { projectTag: "apollo", spentThisWeekMicros: usd(1.75), requests: 3, blockedRequests: 0 },
+      { projectTag: null, spentThisWeekMicros: usd(0.2), requests: 1, blockedRequests: 0 },
+    ]);
+  });
+
+  it("counts blocked requests per project without adding to spend", () => {
+    const report = reportFor([
+      tagged("apollo", 1),
+      blockedFor("apollo"),
+      blockedFor("apollo"),
+      blockedFor(null),
+    ]);
+    expect(report.projects).toEqual([
+      { projectTag: "apollo", spentThisWeekMicros: usd(1), requests: 1, blockedRequests: 2 },
+      { projectTag: null, spentThisWeekMicros: 0, requests: 0, blockedRequests: 1 },
+    ]);
+  });
+
+  it("leaves out records from before this week", () => {
+    const report = reportFor([tagged("apollo", 1), tagged("old", 5, LAST_SUNDAY)]);
+    expect(report.projects.map((row) => row.projectTag)).toEqual(["apollo"]);
+  });
+
+  it("sorts projects by spend, highest first, with untagged last on ties", () => {
+    const report = reportFor([
+      tagged(null, 1),
+      tagged("beta", 1),
+      tagged("small", 0.1),
+      tagged("alpha", 1),
+      tagged("big", 3),
+    ]);
+    expect(report.projects.map((row) => row.projectTag)).toEqual([
+      "big",
+      "alpha",
+      "beta",
+      null,
+      "small",
+    ]);
+  });
+
+  it("returns an empty list for a week with no usage", () => {
+    expect(reportFor([tagged("old", 5, LAST_SUNDAY)]).projects).toEqual([]);
+  });
+});
