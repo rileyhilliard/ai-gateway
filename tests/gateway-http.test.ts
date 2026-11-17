@@ -318,6 +318,83 @@ describe("OpenRouter answers about the company account", () => {
   });
 });
 
+describe("fake upstream headers", () => {
+  const TOKENS = "must be a whole number from 0 to 10000000.";
+  it.each([
+    ["x-fake-input-tokens", "-100000000", TOKENS],
+    ["x-fake-output-tokens", "Infinity", TOKENS],
+    ["x-fake-output-tokens", "lots", TOKENS],
+    ["x-fake-input-tokens", "1.5", TOKENS],
+    ["x-fake-input-tokens", "10000001", TOKENS],
+    ["x-fake-status", "999", "must be 200, or a whole number from 400 to 599."],
+    ["x-fake-status", "204", "must be 200, or a whole number from 400 to 599."],
+    ["x-fake-status", "error", "must be 200, or a whole number from 400 to 599."],
+    ["x-fake-delay-ms", "10001", "must be a whole number from 0 to 10000."],
+    ["x-fake-delay-ms", "-1", "must be a whole number from 0 to 10000."],
+    ["x-fake-drop-after", "-1", "must be a whole number from 0 to 1000."],
+  ])(
+    "reject %s: %s with a 400 naming the allowed range, recording nothing",
+    async (name, value, rule) => {
+      const { app, gateway } = testApp();
+      const res = await post(app, "key-staff", { [name]: value });
+      expect(res.status).toBe(400);
+      expect(await errorOf(res)).toMatchObject({
+        code: "bad_request",
+        issues: [{ path: `header.${name}`, message: `${name} ${rule}` }],
+      });
+      expect(await recordsOf(gateway)).toEqual([]);
+    },
+  );
+
+  it("checks the headers before the budget decision, so a blocked employee gets the 400", async () => {
+    const { app, gateway } = testApp();
+    await post(app, "key-intern", costly);
+    const res = await post(app, "key-intern", { "x-fake-input-tokens": "-1" });
+    expect(res.status).toBe(400);
+    expect(await recordsOf(gateway)).toHaveLength(1);
+  });
+
+  it("checks them on a streaming request too", async () => {
+    const { app } = testApp();
+    const res = await post(
+      app,
+      "key-staff",
+      { "x-fake-output-tokens": "-1" },
+      {
+        ...message,
+        stream: true,
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("lists every bad header at once", async () => {
+    const { app } = testApp();
+    const res = await post(app, "key-staff", {
+      "x-fake-input-tokens": "-1",
+      "x-fake-status": "999",
+    });
+    expect((await errorOf(res)).issues?.map((issue) => issue.path)).toEqual([
+      "header.x-fake-input-tokens",
+      "header.x-fake-status",
+    ]);
+  });
+
+  it("accepts the edges of each range", async () => {
+    const { app, gateway } = testApp();
+    const res = await post(app, "key-staff", {
+      "x-fake-input-tokens": "0",
+      "x-fake-output-tokens": "10000000",
+      "x-fake-delay-ms": "0",
+    });
+    expect(res.status).toBe(200);
+    expect(await recordsOf(gateway)).toMatchObject([{ inputTokens: 0, outputTokens: 10_000_000 }]);
+    // A fresh app, since $10 of output tokens just emptied the first one's pool.
+    const fresh = testApp().app;
+    expect((await post(fresh, "key-staff", { "x-fake-status": "599" })).status).toBe(599);
+  });
+});
+
 describe("project tag", () => {
   it("records the x-project header on the usage record", async () => {
     const { app, gateway } = testApp();
