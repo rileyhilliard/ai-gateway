@@ -116,6 +116,13 @@ describe("admin changes", () => {
     expect(await store.findEmployeeByKey("key-new")).toEqual(updated);
   });
 
+  it("leaves a field alone when the change for it is undefined", async () => {
+    const store = seededStore();
+    expect(await store.updateEmployee("ada", { tierId: undefined, disabled: true })).toEqual(
+      makeEmployee({ disabled: true }),
+    );
+  });
+
   it("returns undefined and changes nothing for an unknown employee", async () => {
     const store = seededStore();
     expect(await store.updateEmployee("nobody", { disabled: true })).toBeUndefined();

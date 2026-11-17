@@ -30,6 +30,10 @@ export type AppDeps = {
  * src/server.ts on Node and runs in tests through app.request().
  */
 export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
+  if (demoClock && gateway.clock !== demoClock.now) {
+    // Advancing a clock the gateway doesn't read would make the demo silently do nothing.
+    throw new Error("demoClock.now must be the clock the gateway reads (gateway.clock).");
+  }
   const app = createRouter();
 
   app.use(requestId({ limitLength: 128 }));
@@ -54,7 +58,9 @@ export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
     budgetRoutes({
       store: gateway.store,
       adminKey: config.adminKey,
-      // Keys come from the same generator as record ids: random UUIDs in production.
+      // Keys come from the same generator as record ids: random UUIDs in production, so a
+      // reissued key never collides with a live one and findEmployeeByKey's first match is the
+      // only match. The store doesn't enforce unique keys itself.
       newApiKey: () => `key-${gateway.newId()}`,
     }),
   );

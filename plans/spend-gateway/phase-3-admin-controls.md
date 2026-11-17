@@ -1,6 +1,6 @@
 # Phase 3: admins change budgets and keys, with a demo clock
 
-Status: scaffolded on `build/spend-gateway-p3` (worktree `.claude/worktrees/phase-3`), branched from phase 2 because it extends the admin key check and routes; one lane running.
+Status: done on `build/spend-gateway-p3` (worktree `.claude/worktrees/phase-3`), branched from phase 2 because it extends the admin key check and routes. Gate green (212 tests); waiting to merge with phase 2.
 Shared spec, error model and contracts: [spec.md](spec.md). Overview and phase status: [README.md](README.md).
 
 Demo: with `ADMIN_KEY` set and `DEMO_CLOCK=1`, send the phase 3 section of `http/admin.http`. Lower the pool and watch the next request get 429, move Ivy to another tier and watch her next request spill instead, revoke and reissue Eli's key, and advance the clock 24 hours to see an allowance refill.
@@ -16,7 +16,8 @@ Defaults taken without a grill round; override any of them.
 - New keys are `key-<id>` from the gateway's id generator (random UUIDs in production), so tests get predictable keys.
 - Unknown employee is 404 `not_found`; unknown tier is 400 `bad_request` with an issue at `json.tierId`.
 - The demo clock adds an offset to the real clock and only moves forward, so new requests are never dated before recorded ones. `POST /admin/clock/advance { hours }` takes 0 < hours <= 336 and exists only when `DEMO_CLOCK=1`.
-- One `updateEmployee(id, changes)` store method instead of one per field.
+- One `updateEmployee(id, changes)` store method instead of one per field; `undefined` values in `changes` are skipped.
+- Dollar inputs are capped at $1,000,000 (`MAX_USD` in `src/budget/money.ts`, shared with the seed loader) so micro-dollar sums stay exact.
 
 ## Contracts
 
@@ -41,3 +42,8 @@ Response shapes: pool `{ id, name, weeklyPoolMicros }`; employee `{ id, name, ti
 | a | M | `src/admin/budget-routes.ts`, `src/admin/clock-route.ts` | opus (auth and money inputs) |
 
 The store and clock changes were small enough to write inline, which left one lane.
+
+## Log
+
+- Lane a (opus) landed clean. Accepted choices: middleware written inline per route (a shared readonly array fails typecheck); OpenAPI component names and operation ids; overrides, revoke and reissue get their 404 from `updateEmployee` instead of a separate lookup.
+- Review (no auth or leak bugs): dollar inputs capped at $1,000,000; one `usdToMicros` for seed and admin; `updateEmployee` skips undefined fields; `createApp` throws if the demo clock isn't the gateway's clock; the 401 tests now prove nothing changed by comparing the usage view; tests for a numeric pool cap and its response; the UUID uniqueness assumption is documented where keys are made.

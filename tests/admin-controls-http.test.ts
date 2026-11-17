@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ErrorEnvelope } from "../src/errors.ts";
-import { ADMIN_KEY, jsonBody, testApp } from "./helpers/app.ts";
+import { ADMIN_KEY, jsonBody, testApp, testGateway } from "./helpers/app.ts";
 
 type App = ReturnType<typeof testApp>["app"];
 
@@ -44,15 +44,18 @@ async function blockReasonOf(res: Response) {
 
 describe("admin key", () => {
   it.each([
-    ["PUT", "/admin/company/pool", { weeklyPoolUsd: 5 }],
+    ["PUT", "/admin/company/pool", { weeklyPoolUsd: 0 }],
     ["PUT", "/admin/employees/ivy/tier", { tierId: "staff" }],
-    ["PUT", "/admin/employees/ivy/overrides", {}],
+    ["PUT", "/admin/employees/ivy/overrides", { dailyAllowanceUsd: 0 }],
     ["DELETE", "/admin/employees/ivy/key", undefined],
     ["POST", "/admin/employees/ivy/key", undefined],
   ])("rejects %s %s without the admin key and changes nothing", async (method, path, body) => {
     const { app } = testApp();
+    const before = await (await admin(app, "GET", "/admin/usage")).json();
     const res = await asAdmin("wrong-key")(app, method, path, body);
     expect(res.status).toBe(401);
+    // Every body above would show in the usage view (pool, tier, allowance, disabled) if applied.
+    expect(await (await admin(app, "GET", "/admin/usage")).json()).toEqual(before);
     expect((await send(app, "key-intern")).status).toBe(200);
   });
 });
@@ -84,6 +87,7 @@ describe("company pool", () => {
     ["a negative pool", { weeklyPoolUsd: -1 }],
     ["a missing pool", {}],
     ["a pool that isn't a number", { weeklyPoolUsd: "5" }],
+    ["a pool over $1,000,000", { weeklyPoolUsd: 1e12 }],
   ])("rejects %s with the 400 envelope naming the field", async (_, body) => {
     const { app } = testApp();
     const res = await admin(app, "PUT", "/admin/company/pool", body);
@@ -146,6 +150,23 @@ describe("overrides", () => {
     const statuses = [];
     for (let i = 0; i < 5; i++) statuses.push((await send(app, "key-engineer")).status);
     expect(statuses).toEqual([200, 200, 200, 200, 200]);
+  });
+
+  it("sets a numeric pool cap in dollars, and a $0 cap stops the spill", async () => {
+    const { app } = testApp();
+    const res = await admin(app, "PUT", "/admin/employees/eli/overrides", {
+      dailyAllowanceUsd: 0.01,
+      poolCapUsd: 0,
+    });
+    expect(await res.json()).toEqual({
+      id: "eli",
+      name: "Eli",
+      tierId: "engineer",
+      disabled: false,
+      overrides: { dailyAllowanceMicros: 10_000, poolCapMicros: 0 },
+    });
+    expect((await send(app, "key-engineer")).status).toBe(200);
+    expect(await blockReasonOf(await send(app, "key-engineer"))).toBe("pool_cap_reached");
   });
 
   it("accepts a $0 allowance, sending every request to the pool or a block", async () => {
@@ -246,6 +267,10 @@ describe("demo clock", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ now: "2026-11-19T00:00:00.000Z" });
     expect((await send(app, "key-intern")).status).toBe(200);
+  });
+
+  it("refuses to start when the gateway reads a different clock than the demo clock", () => {
+    expect(() => testApp({ gateway: testGateway(), demoClock: true })).toThrow(/demoClock/);
   });
 
   it("requires the admin key", async () => {

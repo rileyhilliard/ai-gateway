@@ -45,7 +45,9 @@ export function createMemoryStore(contents: StoreContents): Store {
       const index = employees.findIndex((employee) => employee.id === id);
       const current = employees[index];
       if (!current) return undefined;
-      const updated = { ...current, ...structuredClone(changes) };
+      // Only fields with a value apply, so `{ tierId: undefined }` leaves the tier alone.
+      const given = Object.entries(changes).filter(([, value]) => value !== undefined);
+      const updated = { ...current, ...structuredClone(Object.fromEntries(given)) };
       employees[index] = updated;
       return structuredClone(updated);
     },

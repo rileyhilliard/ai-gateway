@@ -6,6 +6,7 @@
  */
 
 import { createRoute, z } from "@hono/zod-openapi";
+import { MAX_USD, usdToMicros } from "../budget/money.ts";
 import type { Employee, Overrides } from "../budget/types.ts";
 import { BadRequestError, errorResponse, NotFoundError } from "../errors.ts";
 import { createRouter } from "../router.ts";
@@ -19,10 +20,8 @@ export type BudgetAdminDeps = {
   newApiKey: () => string;
 };
 
-const MICROS_PER_DOLLAR = 1_000_000;
-
 const micros = z.number().int();
-const dollars = z.number().nonnegative();
+const dollars = z.number().nonnegative().max(MAX_USD);
 
 const EmployeeParams = z.object({
   id: z.string().openapi({ param: { name: "id", in: "path" }, example: "ivy" }),
@@ -149,7 +148,7 @@ export function budgetRoutes(deps: BudgetAdminDeps) {
   return createRouter()
     .openapi(setPool, async (c) => {
       const { weeklyPoolUsd } = c.req.valid("json");
-      const company = await deps.store.setWeeklyPool(toMicros(weeklyPoolUsd));
+      const company = await deps.store.setWeeklyPool(usdToMicros(weeklyPoolUsd));
       return c.json(
         { id: company.id, name: company.name, weeklyPoolMicros: company.weeklyPoolMicros },
         200,
@@ -179,11 +178,6 @@ export function budgetRoutes(deps: BudgetAdminDeps) {
     });
 }
 
-/** Converts a dollar amount from an admin request to the micro-dollars the app stores. */
-function toMicros(usd: number): number {
-  return Math.round(usd * MICROS_PER_DOLLAR);
-}
-
 /**
  * Builds the full override set from the request. Only fields present in the body appear, so an
  * absent field means "no override" and `poolCapUsd: null` means "uncapped".
@@ -191,10 +185,10 @@ function toMicros(usd: number): number {
 function toOverrides(body: z.infer<typeof OverridesBody>): Overrides {
   const overrides: Overrides = {};
   if (body.dailyAllowanceUsd !== undefined) {
-    overrides.dailyAllowanceMicros = toMicros(body.dailyAllowanceUsd);
+    overrides.dailyAllowanceMicros = usdToMicros(body.dailyAllowanceUsd);
   }
   if (body.poolCapUsd !== undefined) {
-    overrides.poolCapMicros = body.poolCapUsd === null ? null : toMicros(body.poolCapUsd);
+    overrides.poolCapMicros = body.poolCapUsd === null ? null : usdToMicros(body.poolCapUsd);
   }
   return overrides;
 }
