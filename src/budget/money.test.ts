@@ -17,6 +17,13 @@ it("rounds a provider's reported cost up to the next micro-dollar, so it never u
   expect(providerCostToMicros(0)).toBe(0);
   expect(providerCostToMicros(0.0000001)).toBe(1);
   expect(providerCostToMicros(0.000125)).toBe(125);
+  expect(providerCostToMicros(0.0000123)).toBe(13);
+});
+
+it("doesn't round a provider's cost up for float noise in the conversion", () => {
+  // 0.000123 * 1e6 is 123.00000000000001 in floating point.
+  expect(providerCostToMicros(0.000123)).toBe(123);
+  expect(providerCostToMicros(0.0000231)).toBe(24);
 });
 
 it("formats micro-dollars as dollars with two decimals", () => {
