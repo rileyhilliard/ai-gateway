@@ -103,6 +103,16 @@ describe("parseSeed", () => {
     );
   });
 
+  it("rejects dollar amounts above the $1,000,000 ceiling the admin API also enforces", () => {
+    const seed = validSeed();
+    seed.company.weeklyPoolUsd = 1_000_001;
+    if (seed.employees[1])
+      seed.employees[1].overrides = { dailyAllowanceUsd: 1e15, poolCapUsd: null };
+    expect(issuePaths(seed)).toEqual(
+      expect.arrayContaining(["company.weeklyPoolUsd", "employees.1.overrides.dailyAllowanceUsd"]),
+    );
+  });
+
   it("rejects an employee whose tier doesn't exist", () => {
     const seed = validSeed();
     if (seed.employees[0]) seed.employees[0].tierId = "ghost";

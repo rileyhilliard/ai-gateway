@@ -5,12 +5,12 @@
  */
 
 import { z } from "@hono/zod-openapi";
-import { usdToMicros } from "../budget/money.ts";
+import { MAX_USD, usdToMicros } from "../budget/money.ts";
 import type { DailyAllowance, Micros, Overrides } from "../budget/types.ts";
 import type { Issue } from "../errors.ts";
 import type { StoreContents } from "../store/memory.ts";
 
-const dollars = z.number().min(0);
+const dollars = z.number().min(0).max(MAX_USD);
 // Two decimals at most, so it converts to whole basis points.
 const percent = z.number().min(0).max(100).multipleOf(0.01);
 
