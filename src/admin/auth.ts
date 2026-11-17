@@ -4,6 +4,7 @@
  */
 
 import { createMiddleware } from "hono/factory";
+import { UnauthorizedError } from "../errors.ts";
 
 /**
  * Middleware that lets a request through only when its `x-admin-key` matches `adminKey`.
@@ -11,7 +12,10 @@ import { createMiddleware } from "hono/factory";
  * @throws {UnauthorizedError} When the header is missing or wrong, or `adminKey` is undefined.
  */
 export function requireAdmin(adminKey: string | undefined) {
-  return createMiddleware(async () => {
-    throw new Error("not implemented");
+  return createMiddleware(async (c, next) => {
+    // Checked first so an unset key can't be matched by a missing or empty header.
+    if (!adminKey) throw new UnauthorizedError();
+    if (c.req.header("x-admin-key") !== adminKey) throw new UnauthorizedError();
+    await next();
   });
 }
