@@ -8,7 +8,7 @@ import { bodyLimit } from "hono/body-limit";
 import { requestId } from "hono/request-id";
 import { budgetRoutes } from "./admin/budget-routes.ts";
 import { clockRoutes } from "./admin/clock-route.ts";
-import { adminRoutes } from "./admin/usage-route.ts";
+import { usageRoutes } from "./admin/usage-route.ts";
 import type { DemoClock } from "./clock/demo-clock.ts";
 import type { AppConfig } from "./config.ts";
 import { AppError, envelope, toAppError } from "./errors.ts";
@@ -70,7 +70,7 @@ export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
   app.route("/", messagesRoutes(gateway, logger));
   app.route(
     "/",
-    adminRoutes({ store: gateway.store, clock: gateway.clock, adminKey: config.adminKey }),
+    usageRoutes({ store: gateway.store, clock: gateway.clock, adminKey: config.adminKey }),
   );
   app.route(
     "/",
