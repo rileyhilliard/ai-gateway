@@ -4,9 +4,14 @@
  * machine.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { UpstreamUnavailableError } from "../errors.ts";
 import { createOpenRouterUpstream } from "./openrouter.ts";
+import { isUpstreamStream } from "./types.ts";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 type SentRequest = { url: string; init: RequestInit };
 
@@ -167,5 +172,99 @@ describe("createOpenRouterUpstream", () => {
     });
     await expect(sending).rejects.toThrow(UpstreamUnavailableError);
     await expect(sending).rejects.toMatchObject({ cause: { name: "TimeoutError" } });
+  });
+});
+
+describe("createOpenRouterUpstream streaming", () => {
+  const streamBody = { ...messageBody, stream: true };
+  const sseText =
+    'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":3}}}\n\n' +
+    'event: message_stop\ndata: {"type":"message_stop"}\n\n';
+  const sseResponse = (body: BodyInit) =>
+    new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+
+  it("returns a 2xx SSE body as an unread stream of the provider's bytes", async () => {
+    const { fetch, sent } = stubFetch(sseResponse(sseText));
+    const response = await createOpenRouterUpstream({ apiKey: "k", fetch }).stream({
+      body: streamBody,
+      headers: {},
+    });
+    expect(JSON.parse(String(sent[0]?.init.body))).toEqual(streamBody);
+    if (!isUpstreamStream(response)) throw new Error("expected a stream");
+    expect(response.status).toBe(200);
+    expect(await new Response(response.events).text()).toBe(sseText);
+  });
+
+  it("reads an error status in full, as send does", async () => {
+    const errorBody = { type: "error", error: { type: "overloaded_error", message: "Overloaded" } };
+    const { fetch } = stubFetch(jsonResponse(errorBody, 529));
+    const response = await createOpenRouterUpstream({ apiKey: "k", fetch }).stream({
+      body: streamBody,
+      headers: {},
+    });
+    expect(response).toEqual({ status: 529, body: errorBody, usage: null, costMicros: null });
+  });
+
+  it("reads a 2xx that isn't an event stream in full, so a JSON reply is passed on and charged", async () => {
+    const usage = { input_tokens: 12, output_tokens: 34, cost: 0.0000123 };
+    const { fetch } = stubFetch(jsonResponse(okBody(usage)));
+    const response = await createOpenRouterUpstream({ apiKey: "k", fetch }).stream({
+      body: streamBody,
+      headers: {},
+    });
+    expect(response).toEqual({
+      status: 200,
+      body: okBody(usage),
+      usage: { inputTokens: 12, outputTokens: 34 },
+      costMicros: 13,
+    });
+  });
+
+  it("gives up with UpstreamUnavailableError when an error body stalls past the timeout", async () => {
+    // Like real fetch, the stalled body only fails when the request's signal aborts.
+    const stalledError = ((_: unknown, init?: RequestInit) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          init?.signal?.addEventListener("abort", () => controller.error(init.signal?.reason));
+        },
+      });
+      return Promise.resolve(new Response(body, { status: 500 }));
+    }) as typeof fetch;
+    const streaming = createOpenRouterUpstream({
+      apiKey: "k",
+      fetch: stalledError,
+      timeoutMs: 20,
+    }).stream({ body: streamBody, headers: {} });
+    await expect(streaming).rejects.toThrow(UpstreamUnavailableError);
+    await expect(streaming).rejects.toMatchObject({ cause: { name: "TimeoutError" } });
+  });
+
+  it("stops the timeout once the stream has started, so a long stream isn't cut off", async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    const fetchStub = (async (_: unknown, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      return sseResponse(sseText);
+    }) as typeof fetch;
+    await createOpenRouterUpstream({ apiKey: "k", fetch: fetchStub, timeoutMs: 20 }).stream({
+      body: streamBody,
+      headers: {},
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(signal?.aborted).toBe(false);
+  });
+
+  it("gives up with UpstreamUnavailableError when the stream doesn't start in time", async () => {
+    const hanging = ((_: unknown, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+      })) as typeof fetch;
+    const streaming = createOpenRouterUpstream({
+      apiKey: "k",
+      fetch: hanging,
+      timeoutMs: 20,
+    }).stream({ body: streamBody, headers: {} });
+    await expect(streaming).rejects.toThrow(UpstreamUnavailableError);
+    await expect(streaming).rejects.toMatchObject({ cause: { name: "TimeoutError" } });
   });
 });

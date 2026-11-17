@@ -117,6 +117,32 @@ content-type: application/json
 
 { "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
 
+### Streaming. Expect 200 text/event-stream: message_start, a text block, message_delta with usage, message_stop. Charged once the stream ends.
+# @name staffStream
+POST {{baseUrl}}/v1/messages
+x-api-key: {{staffKey}}
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "stream": true, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Streaming, dropped by the provider after 2 events. Expect the stream to cut off after content_block_start, still charged for the 1,000 input and 1 output tokens seen.
+# @name staffStreamDropped
+POST {{baseUrl}}/v1/messages
+x-api-key: {{staffKey}}
+x-fake-drop-after: 2
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "stream": true, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Real streaming through OpenRouter (needs OPENROUTER_KEY in .env). Expect 200 text/event-stream with a real reply, priced by OpenRouter's usage.cost.
+# @name realStream
+POST {{baseUrl}}/v1/messages
+x-api-key: {{staffKey}}
+anthropic-version: 2023-06-01
+content-type: application/json
+
+{ "model": "deepseek/deepseek-v4.1-flash-1017", "max_tokens": 64, "stream": true, "messages": [{ "role": "user", "content": "Say hello in five words." }] }
+
 ### Real inference through OpenRouter (needs OPENROUTER_KEY in .env). Expect 200 with a real reply.
 # @name realInference
 POST {{baseUrl}}/v1/messages

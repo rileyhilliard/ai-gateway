@@ -15,7 +15,7 @@ import { AppError, envelope, toAppError } from "./errors.ts";
 import { toAnthropicError } from "./gateway/anthropic-errors.ts";
 import { messagesRoutes } from "./gateway/messages-route.ts";
 import type { GatewayDeps } from "./gateway/service.ts";
-import { type Logger, requestLogger } from "./logging.ts";
+import { describeCause, describeFailure, type Logger, requestLogger } from "./logging.ts";
 import { type AppEnv, createRouter } from "./router.ts";
 import { healthRoutes } from "./routes/health.ts";
 
@@ -67,7 +67,7 @@ export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
   );
 
   app.route("/", healthRoutes());
-  app.route("/", messagesRoutes(gateway));
+  app.route("/", messagesRoutes(gateway, logger));
   app.route(
     "/",
     adminRoutes({ store: gateway.store, clock: gateway.clock, adminKey: config.adminKey }),
@@ -97,14 +97,7 @@ export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
     const appError = toAppError(error);
     if (appError.code === "internal") {
       // The class and stack go to the log; the message may hold secrets, so it stays out.
-      logger.error(
-        {
-          requestId: c.get("requestId"),
-          errorClass: error.constructor.name,
-          stack: error.stack?.split("\n").slice(1).join("\n"),
-        },
-        "unhandled error",
-      );
+      logger.error({ requestId: c.get("requestId"), ...describeFailure(error) }, "unhandled error");
     }
     if (appError.code === "upstream_unavailable") {
       // A warning, since the client got a 502 it can retry; the cause says what to fix.
@@ -120,9 +113,3 @@ export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
 }
 
 export type App = ReturnType<typeof createApp>;
-
-/** The class and message of an upstream failure's cause, for the log. */
-function describeCause(cause: unknown): { errorClass: string; message: string } | undefined {
-  if (!(cause instanceof Error)) return undefined;
-  return { errorClass: cause.constructor.name, message: cause.message };
-}

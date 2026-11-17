@@ -41,17 +41,16 @@ async function errorOf(res: Response) {
 /** An OpenRouter stand-in that remembers what it was sent and answers with a fixed response. */
 function recordingUpstream(costMicros: number | null = null) {
   const sent: UpstreamRequest[] = [];
-  const upstream: Upstream = {
-    send: async (request) => {
-      sent.push(request);
-      return {
-        status: 200,
-        body: { type: "message", content: [{ type: "text", text: "Real-ish reply." }] },
-        usage: { inputTokens: 10, outputTokens: 20 },
-        costMicros,
-      };
-    },
+  const send: Upstream["send"] = async (request) => {
+    sent.push(request);
+    return {
+      status: 200,
+      body: { type: "message", content: [{ type: "text", text: "Real-ish reply." }] },
+      usage: { inputTokens: 10, outputTokens: 20 },
+      costMicros,
+    };
   };
+  const upstream: Upstream = { send, stream: send };
   return { upstream, sent };
 }
 
@@ -256,11 +255,10 @@ describe("upstream failures", () => {
   });
 
   it("logs why the upstream couldn't be reached, once, as a warning", async () => {
-    const failing: Upstream = {
-      send: async () => {
-        throw new UpstreamUnavailableError(new TypeError("fetch failed"));
-      },
+    const fail = async (): Promise<never> => {
+      throw new UpstreamUnavailableError(new TypeError("fetch failed"));
     };
+    const failing: Upstream = { send: fail, stream: fail };
     const { app, records } = testApp({ gateway: testGateway({ openrouter: failing }) });
     const res = await post(
       app,

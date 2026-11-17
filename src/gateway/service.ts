@@ -1,6 +1,7 @@
 /**
  * One authenticated messages request end to end: check the model has a price, decide the
- * budget, forward to the chosen upstream, and record the usage. HTTP lives in the route.
+ * budget, forward to the chosen upstream, and record the usage (for a stream, once it ends).
+ * HTTP and logging live in the route.
  */
 
 import { decide } from "../budget/decide.ts";
@@ -19,6 +20,13 @@ import type {
 import { BadRequestError, BudgetExceededError, UnknownModelError } from "../errors.ts";
 import type { Store } from "../store/types.ts";
 import { selectUpstream, type Upstreams } from "../upstream/select.ts";
+import {
+  isUpstreamStream,
+  type Upstream,
+  type UpstreamResponse,
+  type UpstreamStream,
+} from "../upstream/types.ts";
+import { type ReportedUsage, type StreamEnd, watchStreamUsage } from "./stream-usage.ts";
 
 /** What the gateway needs from the outside world. */
 export type GatewayDeps = {
@@ -36,8 +44,29 @@ export type MessageRequest = {
   headers: Record<string, string>;
 };
 
-/** The upstream's answer, passed through to the client unchanged. */
-export type MessageResponse = { status: number; body: unknown };
+/**
+ * Whether a stream's usage reached the store. A failure is a value, not a rejection: the
+ * response has started by then, so only the caller's log can report it, with the lost record.
+ */
+export type RecordingOutcome =
+  | { kind: "recorded" | "nothing_to_record" }
+  | { kind: "failed"; record: UsageRecord; cause: unknown };
+
+/** How a stream ended and whether its usage was recorded. */
+export type StreamSettlement = { end: StreamEnd; recording: RecordingOutcome };
+
+/**
+ * The upstream's answer, passed through to the client unchanged. A stream is charged when it
+ * ends, after the response has started, so `settled` resolves then; it never rejects.
+ */
+export type MessageResponse =
+  | { kind: "json"; status: number; body: unknown }
+  | {
+      kind: "stream";
+      status: number;
+      events: ReadableStream<Uint8Array>;
+      settled: Promise<StreamSettlement>;
+    };
 
 // The employee's key and hop-by-hop headers stop here; the upstream adds its own credentials.
 const HEADERS_NOT_FORWARDED = new Set([
@@ -87,15 +116,49 @@ export async function handleMessage(
     throw new BudgetExceededError(decision);
   }
 
-  const upstream = selectUpstream(body.model, deps.upstreams);
-  const response = await upstream.send({ body, headers: forwardableHeaders(request.headers) });
+  const response = await forward(selectUpstream(body.model, deps.upstreams), request);
 
   // No usage reported means nothing we can charge, even for a provider error.
-  if (response.usage) {
-    const cost = response.costMicros ?? costMicros(price, response.usage);
-    await store.addUsage(allowedRecord(base, decision.bucket, response.usage, cost));
+  const recordFor = (reported: ReportedUsage | null): UsageRecord | null => {
+    if (!reported) return null;
+    const cost = reported.costMicros ?? costMicros(price, reported.usage);
+    return allowedRecord(base, decision.bucket, reported.usage, cost);
+  };
+
+  if (isUpstreamStream(response)) {
+    const { events, ended } = watchStreamUsage(response.events);
+    const settled = ended.then(async (end) => ({
+      end,
+      recording: await tryAddUsage(store, recordFor(end.usage)),
+    }));
+    return { kind: "stream", status: response.status, events, settled };
   }
-  return { status: response.status, body: response.body };
+  const record = recordFor(
+    response.usage ? { usage: response.usage, costMicros: response.costMicros } : null,
+  );
+  if (record) await store.addUsage(record);
+  return { kind: "json", status: response.status, body: response.body };
+}
+
+/** Writes the record, reporting a store failure as a value with the record that was lost. */
+async function tryAddUsage(store: Store, record: UsageRecord | null): Promise<RecordingOutcome> {
+  if (!record) return { kind: "nothing_to_record" };
+  try {
+    await store.addUsage(record);
+    return { kind: "recorded" };
+  } catch (cause) {
+    return { kind: "failed", record, cause };
+  }
+}
+
+/** Sends the request, streaming when the client asked to. */
+function forward(
+  upstream: Upstream,
+  request: MessageRequest,
+): Promise<UpstreamResponse | UpstreamStream> {
+  const upstreamRequest = { body: request.body, headers: forwardableHeaders(request.headers) };
+  if (request.body.stream === true) return upstream.stream(upstreamRequest);
+  return upstream.send(upstreamRequest);
 }
 
 type RecordBase = {

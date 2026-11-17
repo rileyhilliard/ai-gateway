@@ -1,11 +1,12 @@
 /**
  * Forwards requests to OpenRouter's Anthropic Messages endpoint with the company key, and
- * reads token usage and OpenRouter's reported cost from the response.
+ * reads token usage and OpenRouter's reported cost from the response. A streaming answer is
+ * handed back unread; the gateway reads its usage as the events pass through.
  */
 
 import type { Micros, TokenUsage } from "../budget/types.ts";
 import { UpstreamUnavailableError } from "../errors.ts";
-import type { Upstream, UpstreamRequest, UpstreamResponse } from "./types.ts";
+import type { Upstream, UpstreamRequest, UpstreamResponse, UpstreamStream } from "./types.ts";
 
 const DEFAULT_BASE_URL = "https://openrouter.ai/api";
 // Long, non-streaming generations can take minutes; this only stops a provider that stalls.
@@ -19,7 +20,10 @@ export type OpenRouterOptions = {
   fetch: typeof fetch;
   /** Defaults to https://openrouter.ai/api. */
   baseUrl?: string;
-  /** How long to wait for the whole response before giving up. Defaults to 5 minutes. */
+  /**
+   * How long to wait for the whole response (a stream: for it to start) before giving up.
+   * Defaults to 5 minutes.
+   */
   timeoutMs?: number;
 };
 
@@ -69,42 +73,81 @@ function readCostMicros(usage: Record<string, unknown> | null): Micros | null {
 /**
  * An upstream that sends each request to OpenRouter. A missing key fails per request.
  *
- * @throws {UpstreamUnavailableError} From `send`, when there is no API key, the fetch or body read
- * fails, or the response takes longer than `timeoutMs`. The original failure is the `cause`.
+ * @throws {UpstreamUnavailableError} From `send` and `stream`, when there is no API key, the
+ * fetch or a full body read fails, or the provider takes longer than `timeoutMs` (for `stream`,
+ * to start answering). The original failure is the `cause`.
  */
 export function createOpenRouterUpstream(options: OpenRouterOptions): Upstream {
   const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  /** Posts the request; `signal` bounds the call, and for `send` the body read after it. */
+  async function post({ body, headers }: UpstreamRequest, signal: AbortSignal): Promise<Response> {
+    if (!options.apiKey) {
+      throw new UpstreamUnavailableError(new Error("OPENROUTER_KEY is not set"));
+    }
+    try {
+      return await options.fetch(`${baseUrl}/v1/messages`, {
+        method: "POST",
+        headers: outgoingHeaders(options.apiKey, headers),
+        body: JSON.stringify(body),
+        signal,
+      });
+    } catch (cause) {
+      throw new UpstreamUnavailableError(cause);
+    }
+  }
 
   return {
-    async send({ body, headers }: UpstreamRequest): Promise<UpstreamResponse> {
-      if (!options.apiKey) {
-        throw new UpstreamUnavailableError(new Error("OPENROUTER_KEY is not set"));
-      }
-
-      let status: number;
-      let text: string;
-      // Reading the body is inside the try too: a connection can drop after the headers arrive.
-      try {
-        const response = await options.fetch(`${baseUrl}/v1/messages`, {
-          method: "POST",
-          headers: outgoingHeaders(options.apiKey, headers),
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
-        });
-        status = response.status;
-        text = await response.text();
-      } catch (cause) {
-        throw new UpstreamUnavailableError(cause);
-      }
-
-      const parsedBody = parseBody(text);
-      const usage = usageObjectOf(parsedBody);
-      return {
-        status,
-        body: parsedBody,
-        usage: readTokenUsage(usage),
-        costMicros: readCostMicros(usage),
-      };
+    async send(request: UpstreamRequest): Promise<UpstreamResponse> {
+      return readFullResponse(await post(request, AbortSignal.timeout(timeoutMs)));
     },
+
+    async stream(request: UpstreamRequest): Promise<UpstreamResponse | UpstreamStream> {
+      // The timeout covers everything up to the start of an event stream, and nothing after it:
+      // a long generation can stream for longer, and the client cancelling still closes the
+      // connection. Any other answer is read in full under the timeout, like `send`.
+      const timeout = new AbortController();
+      const timer = setTimeout(
+        () => timeout.abort(new DOMException("OpenRouter didn't answer in time", "TimeoutError")),
+        timeoutMs,
+      );
+      try {
+        const response = await post(request, timeout.signal);
+        if (response.ok && response.body !== null && isEventStream(response)) {
+          return { kind: "stream", status: response.status, events: response.body };
+        }
+        return await readFullResponse(response);
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  };
+}
+
+/** Whether the provider answered with server-sent events, rather than JSON for a 2xx. */
+function isEventStream(response: Response): boolean {
+  return response.headers.get("content-type")?.startsWith("text/event-stream") ?? false;
+}
+
+/**
+ * Reads the whole body and its usage.
+ *
+ * @throws {UpstreamUnavailableError} When the connection drops or times out while reading.
+ */
+async function readFullResponse(response: Response): Promise<UpstreamResponse> {
+  let text: string;
+  try {
+    text = await response.text();
+  } catch (cause) {
+    throw new UpstreamUnavailableError(cause);
+  }
+  const parsedBody = parseBody(text);
+  const usage = usageObjectOf(parsedBody);
+  return {
+    status: response.status,
+    body: parsedBody,
+    usage: readTokenUsage(usage),
+    costMicros: readCostMicros(usage),
   };
 }
