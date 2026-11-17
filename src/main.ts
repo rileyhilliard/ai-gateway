@@ -10,7 +10,7 @@ import { createApp } from "./app.ts";
 import { DEFAULT_PRICES } from "./budget/pricing.ts";
 import { createDemoClock } from "./clock/demo-clock.ts";
 import { ConfigError, loadConfig } from "./config.ts";
-import { createLogger } from "./logging.ts";
+import { createLogger, describeFailure } from "./logging.ts";
 import { parseSeed, SeedError } from "./seed/load.ts";
 import { startServer } from "./server.ts";
 import { createMemoryStore } from "./store/memory.ts";
@@ -30,7 +30,7 @@ let seed: ReturnType<typeof parseSeed>;
 try {
   seed = parseSeed(JSON.parse(await readFile(config.seedPath, "utf8")));
 } catch (error) {
-  if (!(error instanceof SeedError || error instanceof SyntaxError || isFileError(error)))
+  if (!(error instanceof SeedError || error instanceof SyntaxError || isSystemError(error)))
     throw error;
   process.stderr.write(`Can't load seed ${config.seedPath}: ${error.message}\n`);
   process.exit(1);
@@ -57,7 +57,16 @@ const gateway = {
   clock: demoClock?.now ?? (() => new Date()),
   newId: randomUUID,
 };
-const server = await startServer(createApp({ config, logger, gateway, demoClock }), config.port);
+let server: Awaited<ReturnType<typeof startServer>>;
+try {
+  server = await startServer(createApp({ config, logger, gateway, demoClock }), config.port);
+} catch (error) {
+  if (!(isSystemError(error) && error.code === "EADDRINUSE")) throw error;
+  process.stderr.write(
+    `Port ${config.port} is already in use. Stop whatever is listening there, or set PORT_API to a free port.\n`,
+  );
+  process.exit(1);
+}
 logger.info({ port: server.port }, "listening");
 
 let stopping = false;
@@ -72,15 +81,17 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     server.close().then(
       () => process.exit(0),
       (error: unknown) => {
-        const errorClass = error instanceof Error ? error.constructor.name : typeof error;
-        logger.error({ errorClass }, "close failed");
+        logger.error(describeFailure(error), "close failed");
         process.exit(1);
       },
     );
   });
 }
 
-/** A missing or unreadable seed file: Node's fs errors carry a string `code` such as ENOENT. */
-function isFileError(error: unknown): error is Error & { code: string } {
+/**
+ * A Node system error, which carries a string `code`: ENOENT for a missing seed file,
+ * EADDRINUSE for a taken port.
+ */
+function isSystemError(error: unknown): error is Error & { code: string } {
   return error instanceof Error && "code" in error && typeof error.code === "string";
 }
