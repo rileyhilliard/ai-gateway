@@ -22,6 +22,8 @@ Product spec: [problem-statement.md](../../problem-statement.md). Build spec, er
 | [6](phase-6-percent-of-pool.md) | Percent-of-pool allowances | 3 | done (`phase-6`) | |
 | [7](phase-7-project-tags.md) | Project tags and spend by project | 2 | done (`phase-7`) | |
 
+[handoff.md](handoff.md) is history: the hand-verification steps written as each phase landed. It isn't kept current; the root README describes how the gateway works now.
+
 Phase 1 has full lane briefs and test cases. Later phases get theirs while the phase before them runs. Not planned in detail: configurable reset periods and time zones, coding vs prototyping categories.
 
 ## Log
