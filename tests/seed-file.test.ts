@@ -29,6 +29,12 @@ it("loads seed/company.json with the demo company, tiers and keys", () => {
       dailyAllowance: { kind: "fixed", micros: 50_000 },
       overflow: { kind: "pool", weeklyCapMicros: null },
     },
+    {
+      id: "contractor",
+      name: "Contractor",
+      dailyAllowance: { kind: "percentOfPool", basisPoints: 500 },
+      overflow: { kind: "block" },
+    },
   ]);
   const keys = contents.employees.map((employee) => [
     employee.apiKey,
@@ -40,5 +46,6 @@ it("loads seed/company.json with the demo company, tiers and keys", () => {
     ["key-engineer", "engineer", false],
     ["key-staff", "staff", false],
     ["key-disabled", "intern", true],
+    ["key-contractor", "contractor", false],
   ]);
 });

@@ -18,12 +18,19 @@
       "name": "Staff",
       "dailyAllowanceUsd": 0.05,
       "overflow": { "kind": "pool", "weeklyCapUsd": null }
+    },
+    {
+      "id": "contractor",
+      "name": "Contractor",
+      "dailyAllowancePercentOfPool": 5,
+      "overflow": { "kind": "block" }
     }
   ],
   "employees": [
     { "id": "ivy", "name": "Ivy", "tierId": "intern", "apiKey": "key-intern" },
     { "id": "eli", "name": "Eli", "tierId": "engineer", "apiKey": "key-engineer" },
     { "id": "sam", "name": "Sam", "tierId": "staff", "apiKey": "key-staff" },
-    { "id": "dee", "name": "Dee", "tierId": "intern", "apiKey": "key-disabled", "disabled": true }
+    { "id": "dee", "name": "Dee", "tierId": "intern", "apiKey": "key-disabled", "disabled": true },
+    { "id": "cal", "name": "Cal", "tierId": "contractor", "apiKey": "key-contractor" }
   ]
 }

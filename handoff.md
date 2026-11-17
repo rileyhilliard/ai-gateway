@@ -98,3 +98,7 @@ DEMO_CLOCK=1              # optional: enables POST /admin/clock/advance
 ```
 
 Then send some requests from `http/gateway.http` and work through `http/admin.http` top to bottom. Its comments say what each request should return. The usage view is also a page at `localhost:3000/admin`. Without `ADMIN_KEY`, every admin request gets 401 and phase 1 behaves exactly as described above.
+
+## Phase 6: percent-of-pool allowances
+
+Tagged `phase-6`. The seed now has a Contractor tier whose daily allowance is 5% of the weekly pool, and Cal (`key-contractor`) on it. With the $1 pool that's $0.05 a day, then blocked. Send requests as `key-contractor` with `x-fake-output-tokens: 10000` ($0.011 each): the fifth is allowed and the sixth is a 429 with `limitMicros: 50000`. Then `PUT /admin/company/pool` with `{"weeklyPoolUsd": 2}` and send again: the allowance is now $0.10 and the request goes through, with no change to the tier. `GET /admin/usage` shows Cal's `dailyAllowanceMicros` move with the pool.

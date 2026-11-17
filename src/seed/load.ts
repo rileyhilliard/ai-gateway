@@ -1,28 +1,42 @@
 /**
  * Validates the seed JSON (company, tiers, employees, in dollars) and converts it into store
- * contents in micro-dollars. Reading the file is main.ts's job, since only it may touch Node.
+ * contents in micro-dollars. A tier's allowance is dollars or a percent of the weekly pool,
+ * stored as basis points. Reading the file is main.ts's job, since only it may touch Node.
  */
 
 import { z } from "@hono/zod-openapi";
 import { usdToMicros } from "../budget/money.ts";
-import type { Micros, Overrides } from "../budget/types.ts";
+import type { DailyAllowance, Micros, Overrides } from "../budget/types.ts";
 import type { Issue } from "../errors.ts";
 import type { StoreContents } from "../store/memory.ts";
 
 const dollars = z.number().min(0);
+// Two decimals at most, so it converts to whole basis points.
+const percent = z.number().min(0).max(100).multipleOf(0.01);
 
 const seedSchema = z.object({
   company: z.object({ id: z.string(), name: z.string(), weeklyPoolUsd: dollars }),
   tiers: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      dailyAllowanceUsd: dollars,
-      overflow: z.discriminatedUnion("kind", [
-        z.object({ kind: z.literal("block") }),
-        z.object({ kind: z.literal("pool"), weeklyCapUsd: dollars.nullable() }),
-      ]),
-    }),
+    z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        dailyAllowanceUsd: dollars.optional(),
+        dailyAllowancePercentOfPool: percent.optional(),
+        overflow: z.discriminatedUnion("kind", [
+          z.object({ kind: z.literal("block") }),
+          z.object({ kind: z.literal("pool"), weeklyCapUsd: dollars.nullable() }),
+        ]),
+      })
+      .refine(
+        (tier) =>
+          (tier.dailyAllowanceUsd === undefined) !==
+          (tier.dailyAllowancePercentOfPool === undefined),
+        {
+          path: ["dailyAllowanceUsd"],
+          message: "set exactly one of dailyAllowanceUsd or dailyAllowancePercentOfPool",
+        },
+      ),
   ),
   employees: z.array(
     z.object({
@@ -109,7 +123,7 @@ function toStoreContents(seed: SeedShape): StoreContents {
     tiers: seed.tiers.map((tier) => ({
       id: tier.id,
       name: tier.name,
-      dailyAllowance: { kind: "fixed", micros: usdToMicros(tier.dailyAllowanceUsd) },
+      dailyAllowance: toAllowance(tier),
       overflow:
         tier.overflow.kind === "block"
           ? { kind: "block" }
@@ -125,6 +139,22 @@ function toStoreContents(seed: SeedShape): StoreContents {
       disabled: employee.disabled,
     })),
   };
+}
+
+/** A tier's allowance from whichever of the two fields the seed set. */
+function toAllowance(tier: SeedShape["tiers"][number]): DailyAllowance {
+  if (tier.dailyAllowancePercentOfPool !== undefined) {
+    // Rounded because 0.07 * 100 is 7.000000000000001 in floating point.
+    return {
+      kind: "percentOfPool",
+      basisPoints: Math.round(tier.dailyAllowancePercentOfPool * 100),
+    };
+  }
+  if (tier.dailyAllowanceUsd !== undefined) {
+    return { kind: "fixed", micros: usdToMicros(tier.dailyAllowanceUsd) };
+  }
+  // The schema's refine rejects a tier with neither, so reaching this is a bug.
+  throw new Error(`Tier "${tier.id}" has no daily allowance after validation.`);
 }
 
 /** Converts only the override fields the seed sets, so "missing" stays distinct from `null`. */

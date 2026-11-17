@@ -18,9 +18,9 @@ Product spec: [problem-statement.md](../../problem-statement.md). Build spec, er
 | [2](phase-2-usage-view.md) | Admins see spend per employee | 1 | done (`phase-2`) | |
 | [3](phase-3-admin-controls.md) | Admins change budgets and keys, with a demo clock | 2 | done (`phase-3`) | |
 | [4](phase-4-anthropic-errors.md) | Anthropic-shaped errors for real clients | 1 | done (`phase-4`) | |
-| [5](phase-5-streaming.md) | Streaming, so Claude Code works through the gateway | 4 | planned | |
-| [6](phase-6-percent-of-pool.md) | Percent-of-pool allowances | 3 | planned | |
-| [7](phase-7-project-tags.md) | Project tags and spend by project | 2 | planned | |
+| [5](phase-5-streaming.md) | Streaming, so Claude Code works through the gateway | 4 | running (lane a, opus) | |
+| [6](phase-6-percent-of-pool.md) | Percent-of-pool allowances | 3 | done (`phase-6`) | |
+| [7](phase-7-project-tags.md) | Project tags and spend by project | 2 | running (lane a, opus) | |
 
 Phase 1 has full lane briefs and test cases. Later phases get theirs while the phase before them runs. Not planned in detail: configurable reset periods and time zones, coding vs prototyping categories.
 
@@ -35,3 +35,4 @@ Phase 1 has full lane briefs and test cases. Later phases get theirs while the p
 - Phase 1 review of lane a (no spec violations): spend sums now use a half-open period so records dated after a set-back clock don't count; tests added for a week spanning New Year, `next*` under TZ, a Chicago instant on a different local day, and a $0 allowance override; the pool-cap block is built inline like the other two.
 - Phases 2 and 3 built on their own branches (`build/spend-gateway-p2`, then `-p3` cut from it, since phase 3 extends phase 2's admin key and routes) so the landing checkout stayed untouched while phase 1 was verified by hand, then landed together at `aa5ed2f`. Gate 212 tests.
 - The phase 2 scaffold committed the worktree `node_modules` symlink: the ignore rule `node_modules/` only matches directories. Fixed in `0e0de4a`; the rule is now `node_modules`.
+- Phases 5, 6 and 7 ran together off one seam commit (`727bece`) that took the two shared contracts: the tier allowance union with pool-aware `effectiveLimits` (phase 6 core), and `x-project` read into `projectTag` (phase 7's gateway half). After it, phase 5 owns the gateway and upstreams, phase 7 the usage report and page, and phase 6's remainder (the seed) ran inline.

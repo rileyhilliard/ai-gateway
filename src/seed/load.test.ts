@@ -122,3 +122,36 @@ describe("parseSeed", () => {
     expect(() => parseSeed(json)).toThrow(SeedError);
   });
 });
+
+describe("percent-of-pool allowances", () => {
+  /** The valid seed with its first tier (intern) given `allowance` in place of dollars. */
+  const withTier = (allowance: Record<string, unknown>) => {
+    const seed = validSeed();
+    const [, ...rest] = seed.tiers;
+    const intern = { id: "intern", name: "Intern", overflow: { kind: "block" }, ...allowance };
+    return { ...seed, tiers: [intern, ...rest] };
+  };
+
+  it("stores a percent of the weekly pool as basis points", () => {
+    const share = parseSeed(withTier({ dailyAllowancePercentOfPool: 2.5 }));
+    expect(share.tiers[0]?.dailyAllowance).toEqual({ kind: "percentOfPool", basisPoints: 250 });
+    // 0.07 * 100 is 7.000000000000001 in floating point; it must still be 7.
+    const small = parseSeed(withTier({ dailyAllowancePercentOfPool: 0.07 }));
+    expect(small.tiers[0]?.dailyAllowance).toEqual({ kind: "percentOfPool", basisPoints: 7 });
+  });
+
+  it("rejects a tier with both a dollar and a percent allowance, or neither", () => {
+    const both = withTier({ dailyAllowanceUsd: 1, dailyAllowancePercentOfPool: 5 });
+    expect(issuePaths(both)).toEqual(["tiers.0.dailyAllowanceUsd"]);
+    expect(issuePaths(withTier({}))).toEqual(["tiers.0.dailyAllowanceUsd"]);
+  });
+
+  it("rejects a percent above 100 or with more than two decimals", () => {
+    expect(issuePaths(withTier({ dailyAllowancePercentOfPool: 101 }))).toEqual([
+      "tiers.0.dailyAllowancePercentOfPool",
+    ]);
+    expect(issuePaths(withTier({ dailyAllowancePercentOfPool: 1.234 }))).toEqual([
+      "tiers.0.dailyAllowancePercentOfPool",
+    ]);
+  });
+});
