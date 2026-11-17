@@ -15,17 +15,35 @@ export type SseParser = {
   push(text: string): string[];
 };
 
-/** The pass-through stream and the usage it saw, settled once the stream ends for any reason. */
+/**
+ * How a watched stream ended, with the usage seen by then (null when there was none). `dropped`
+ * means the provider's stream failed; `cause` is its error.
+ */
+export type StreamEnd =
+  | { kind: "finished" | "cancelled"; usage: ReportedUsage | null }
+  | { kind: "dropped"; usage: ReportedUsage | null; cause: unknown };
+
+/** The pass-through stream, and how it ended. */
 export type WatchedStream = {
   events: ReadableStream<Uint8Array>;
-  /** Resolves when the stream completes, fails or is cancelled; null when no usage was seen. */
-  ended: Promise<ReportedUsage | null>;
+  /** Resolves, never rejects, when the stream finishes, the provider drops it or the reader cancels. */
+  ended: Promise<StreamEnd>;
 };
 
 const LINE_BREAK = /\r\n|\r|\n/;
 const DATA_FIELD = "data:";
 // OpenRouter's usage.cost is in dollars; rounding up, like the JSON path, never undercharges.
 const MICROS_PER_DOLLAR = 1_000_000;
+// Anthropic's own mid-stream error event, so SDK clients raise a readable error rather than
+// seeing a connection reset.
+const STREAM_DROPPED_EVENT = `event: error\ndata: ${JSON.stringify({
+  type: "error",
+  error: {
+    type: "api_error",
+    message:
+      "The provider's stream ended early. Usage up to that point was charged; retry the request.",
+  },
+})}\n\n`;
 
 /**
  * A parser for the SSE wire format: lines end in `\n`, `\r\n` or `\r`, a blank line ends an
@@ -57,21 +75,22 @@ export function createSseParser(): SseParser {
 /**
  * Wraps a provider's event stream so its bytes pass through as they arrive while their usage is
  * read on the way. Cancelling the returned stream cancels the source, which closes the provider
- * connection. A source failure is passed on to the reader unchanged.
+ * connection. A source failure ends the stream with an Anthropic `error` event instead of
+ * erroring it, and is reported through `ended` for the caller to log.
  */
 export function watchStreamUsage(source: ReadableStream<Uint8Array>): WatchedStream {
   const reader = source.getReader();
   const decoder = new TextDecoder();
   const parser = createSseParser();
   const tally = createUsageTally();
-  let finish: (usage: ReportedUsage | null) => void = () => {};
-  const ended = new Promise<ReportedUsage | null>((resolve) => {
-    finish = resolve;
+  let resolveEnded: (end: StreamEnd) => void = () => {};
+  const ended = new Promise<StreamEnd>((resolve) => {
+    resolveEnded = resolve;
   });
   let isFinished = false;
-  const end = () => {
+  const end = (how: { kind: "finished" | "cancelled" } | { kind: "dropped"; cause: unknown }) => {
     isFinished = true;
-    finish(tally.current());
+    resolveEnded({ ...how, usage: tally.current() });
   };
 
   const events = new ReadableStream<Uint8Array>({
@@ -79,15 +98,18 @@ export function watchStreamUsage(source: ReadableStream<Uint8Array>): WatchedStr
       let chunk: ReadableStreamReadResult<Uint8Array>;
       try {
         chunk = await reader.read();
-      } catch (error) {
-        end();
-        controller.error(error);
+      } catch (cause) {
+        // Erroring the response would only reach the Node server, which logs it outside the
+        // app's logger and resets the connection; the client learns more from an error event.
+        end({ kind: "dropped", cause });
+        controller.enqueue(new TextEncoder().encode(STREAM_DROPPED_EVENT));
+        controller.close();
         return;
       }
       // A cancel can land while the read above is pending; the stream is closed by then.
       if (isFinished) return;
       if (chunk.done) {
-        end();
+        end({ kind: "finished" });
         controller.close();
         return;
       }
@@ -97,7 +119,7 @@ export function watchStreamUsage(source: ReadableStream<Uint8Array>): WatchedStr
       controller.enqueue(chunk.value);
     },
     async cancel(reason) {
-      end();
+      end({ kind: "cancelled" });
       await reader.cancel(reason);
     },
   });

@@ -43,6 +43,27 @@ export function createLogger(level: LogLevel, destination?: DestinationStream): 
 }
 
 /**
+ * The class and stack of an unexpected failure, for an error record. The message stays out, since
+ * it may hold secrets; the stack's first line is the message, so it is dropped too.
+ */
+export function describeFailure(error: unknown): { errorClass: string; stack?: string } {
+  if (!(error instanceof Error)) return { errorClass: typeof error };
+  return {
+    errorClass: error.constructor.name,
+    stack: error.stack?.split("\n").slice(1).join("\n"),
+  };
+}
+
+/**
+ * The class and message of a dependency's failure (a provider that couldn't be reached or dropped
+ * a stream), for a warning that says what to fix. Undefined when the cause isn't an Error.
+ */
+export function describeCause(cause: unknown): { errorClass: string; message: string } | undefined {
+  if (!(cause instanceof Error)) return undefined;
+  return { errorClass: cause.constructor.name, message: cause.message };
+}
+
+/**
  * One record per request after the response is ready: method, route pattern (never the raw URL,
  * whose query may hold secrets), status, duration and request id. Health probes log at debug.
  */

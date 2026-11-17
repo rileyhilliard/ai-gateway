@@ -22,6 +22,9 @@ const streamingMessage = {
 // 1,000 input + 10,000 output tokens at $1 per million: $0.011, just over a $0.01 allowance.
 const costly = { "x-fake-output-tokens": "10000" };
 
+const DROPPED_EVENT =
+  'event: error\ndata: {"type":"error","error":{"type":"api_error","message":"The provider\'s stream ended early. Usage up to that point was charged; retry the request."}}\n\n';
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -154,33 +157,60 @@ describe("streaming pass-through", () => {
 
 describe("streams that end early", () => {
   it("charges the usage seen so far when the provider drops mid-stream", async () => {
-    const { app, gateway } = testApp();
+    const { app, gateway, records } = testApp();
     // Two events: message_start (1,000 input, 1 output) and content_block_start.
     const res = await post(app, "key-staff", { "x-fake-drop-after": "2" });
     expect(res.status).toBe(200);
-    await expect(res.text()).rejects.toThrow(/dropped the stream/);
+    const text = await res.text();
+    expect(text).toMatch(/^event: message_start\n.*\n\nevent: content_block_start\n.*\n\n/);
+    expect(text.endsWith(DROPPED_EVENT)).toBe(true);
     expect(await waitForRecords(gateway, 1)).toMatchObject([
       { status: "allowed", inputTokens: 1000, outputTokens: 1, costMicros: 1001 },
+    ]);
+    expect(records.filter((record) => record.msg === "upstream stream dropped")).toEqual([
+      expect.objectContaining({
+        level: "warn",
+        requestId: res.headers.get("x-request-id"),
+        cause: {
+          errorClass: "Error",
+          message: "Fake upstream dropped the stream after 2 event(s) (x-fake-drop-after).",
+        },
+      }),
     ]);
   });
 
   it("charges the usage seen so far when the client cancels mid-stream", async () => {
-    const { app, gateway } = testApp();
-    const res = await post(app, "key-staff");
+    let providerCancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(openRouterEvents[0]));
+      },
+      cancel() {
+        providerCancelled = true;
+      },
+    });
+    const fetchStub = (async () =>
+      new Response(body, { headers: { "content-type": "text/event-stream" } })) as typeof fetch;
+    const upstream = createOpenRouterUpstream({ apiKey: "k", fetch: fetchStub });
+    const { app, gateway } = testApp({ gateway: testGateway({ openrouter: upstream }) });
+
+    const res = await post(app, "key-staff", {}, { ...streamingMessage, model: REAL_MODEL });
     const reader = res.body?.getReader();
     if (!reader) throw new Error("streaming response has no body");
     const first = await reader.read();
-    expect(decoder.decode(first.value)).toContain("event: message_start");
+    expect(decoder.decode(first.value)).toBe(openRouterEvents[0]);
     await reader.cancel();
+    // The cancel reaches the provider's body, which is what closes a real connection.
+    expect(providerCancelled).toBe(true);
     expect(await waitForRecords(gateway, 1)).toMatchObject([
-      { status: "allowed", inputTokens: 1000, outputTokens: 1, costMicros: 1001 },
+      { status: "allowed", model: REAL_MODEL, inputTokens: 12, outputTokens: 1 },
     ]);
   });
 
   it("records nothing for a stream that ends before any usage event", async () => {
     const { app, gateway } = testApp();
     const dropped = await post(app, "key-staff", { "x-fake-drop-after": "0" });
-    await expect(dropped.text()).rejects.toThrow(/dropped the stream/);
+    expect(await dropped.text()).toBe(DROPPED_EVENT);
     // A complete second stream is the marker: once it is charged, the first had its chance.
     const complete = await post(app, "key-staff");
     await complete.text();
@@ -228,18 +258,38 @@ describe("recording failures", () => {
     const { app, records } = testApp({
       gateway: testGateway({ store: storeFailingAllowedUsage() }),
     });
-    const res = await post(app, "key-staff");
+    const res = await post(app, "key-staff", { "x-project": "apollo" });
     const text = await res.text();
     expect(text.endsWith('event: message_stop\ndata: {"type":"message_stop"}\n\n')).toBe(true);
 
     const notRecorded = () => records.filter((record) => record.msg === "usage not recorded");
     await vi.waitFor(() => expect(notRecorded()).toHaveLength(1));
+    // Everything needed to rebuild the lost charge by hand.
     expect(notRecorded()).toEqual([
       expect.objectContaining({
         level: "error",
         requestId: res.headers.get("x-request-id"),
         errorClass: "Error",
+        record: expect.objectContaining({
+          employeeId: "sam",
+          model: "fake/model",
+          bucket: "personal",
+          inputTokens: 1000,
+          outputTokens: 500,
+          costMicros: 1500,
+          startedAt: NOW.toISOString(),
+          projectTag: "apollo",
+        }),
       }),
     ]);
+  });
+});
+
+describe("request ids", () => {
+  it("returns x-request-id on a JSON pass-through, as on every other response", async () => {
+    const { app } = testApp();
+    const res = await post(app, "key-staff", {}, { ...streamingMessage, stream: false });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-request-id")).toMatch(/.+/);
   });
 });

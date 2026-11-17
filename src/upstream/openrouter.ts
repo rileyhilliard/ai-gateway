@@ -6,12 +6,7 @@
 
 import type { Micros, TokenUsage } from "../budget/types.ts";
 import { UpstreamUnavailableError } from "../errors.ts";
-import type {
-  StreamingUpstream,
-  UpstreamRequest,
-  UpstreamResponse,
-  UpstreamStream,
-} from "./types.ts";
+import type { Upstream, UpstreamRequest, UpstreamResponse, UpstreamStream } from "./types.ts";
 
 const DEFAULT_BASE_URL = "https://openrouter.ai/api";
 // Long, non-streaming generations can take minutes; this only stops a provider that stalls.
@@ -82,7 +77,7 @@ function readCostMicros(usage: Record<string, unknown> | null): Micros | null {
  * fetch or a full body read fails, or the provider takes longer than `timeoutMs` (for `stream`,
  * to start answering). The original failure is the `cause`.
  */
-export function createOpenRouterUpstream(options: OpenRouterOptions): StreamingUpstream {
+export function createOpenRouterUpstream(options: OpenRouterOptions): Upstream {
   const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
@@ -109,26 +104,30 @@ export function createOpenRouterUpstream(options: OpenRouterOptions): StreamingU
     },
 
     async stream(request: UpstreamRequest): Promise<UpstreamResponse | UpstreamStream> {
-      // The timeout only covers the wait for the response to start: a long generation can keep
-      // streaming for longer than it, and the client cancelling still closes the connection.
-      const startTimeout = new AbortController();
+      // The timeout covers everything up to the start of an event stream, and nothing after it:
+      // a long generation can stream for longer, and the client cancelling still closes the
+      // connection. Any other answer is read in full under the timeout, like `send`.
+      const timeout = new AbortController();
       const timer = setTimeout(
-        () =>
-          startTimeout.abort(
-            new DOMException("OpenRouter didn't start answering in time", "TimeoutError"),
-          ),
+        () => timeout.abort(new DOMException("OpenRouter didn't answer in time", "TimeoutError")),
         timeoutMs,
       );
-      let response: Response;
       try {
-        response = await post(request, startTimeout.signal);
+        const response = await post(request, timeout.signal);
+        if (response.ok && response.body !== null && isEventStream(response)) {
+          return { kind: "stream", status: response.status, events: response.body };
+        }
+        return await readFullResponse(response);
       } finally {
         clearTimeout(timer);
       }
-      if (!response.ok || response.body === null) return readFullResponse(response);
-      return { kind: "stream", status: response.status, events: response.body };
     },
   };
+}
+
+/** Whether the provider answered with server-sent events, rather than JSON for a 2xx. */
+function isEventStream(response: Response): boolean {
+  return response.headers.get("content-type")?.startsWith("text/event-stream") ?? false;
 }
 
 /**

@@ -38,17 +38,11 @@ export interface Upstream {
    */
   send(request: UpstreamRequest): Promise<UpstreamResponse>;
   /**
-   * Sends one `stream: true` request. A 2xx answer comes back as an `UpstreamStream`; an error
-   * status comes back read in full, exactly as `send` returns it. Optional so a test double
-   * that only answers JSON stays an `Upstream`; the gateway falls back to `send` without it.
+   * Sends one `stream: true` request. A 2xx event stream comes back as an `UpstreamStream`;
+   * any other answer comes back read in full, exactly as `send` returns it.
    *
    * @throws {UpstreamUnavailableError} When the provider can't be reached before it answers.
    */
-  stream?(request: UpstreamRequest): Promise<UpstreamResponse | UpstreamStream>;
-}
-
-/** An upstream that can stream; both real upstreams are one. */
-export interface StreamingUpstream extends Upstream {
   stream(request: UpstreamRequest): Promise<UpstreamResponse | UpstreamStream>;
 }
 

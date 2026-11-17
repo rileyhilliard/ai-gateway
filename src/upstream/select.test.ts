@@ -9,8 +9,8 @@ import type { Upstream } from "./types.ts";
 const unused = (): never => {
   throw new Error("not called in this test");
 };
-const fake: Upstream = { send: unused };
-const openrouter: Upstream = { send: unused };
+const fake: Upstream = { send: unused, stream: unused };
+const openrouter: Upstream = { send: unused, stream: unused };
 
 describe("selectUpstream", () => {
   it("sends fake/ models to the fake upstream", () => {

@@ -7,6 +7,11 @@
 import { describe, expect, it } from "vitest";
 import { createSseParser, watchStreamUsage } from "./stream-usage.ts";
 
+// The frame the client gets in place of the provider's lost events, spelled out in full here so
+// a change to its wording or shape fails this test.
+const EXPECTED_DROPPED_EVENT =
+  'event: error\ndata: {"type":"error","error":{"type":"api_error","message":"The provider\'s stream ended early. Usage up to that point was charged; retry the request."}}\n\n';
+
 const encoder = new TextEncoder();
 
 /** A source that emits each string as its own chunk, then closes. */
@@ -29,7 +34,7 @@ const messageDelta = (usage: Record<string, unknown>) =>
 async function watch(chunks: string[]) {
   const { events, ended } = watchStreamUsage(sourceOf(chunks));
   const text = await new Response(events).text();
-  return { text, usage: await ended };
+  return { text, usage: (await ended).usage };
 }
 
 describe("createSseParser", () => {
@@ -66,7 +71,7 @@ describe("watchStreamUsage", () => {
 
   it("lets input_tokens on message_delta win over message_start's", async () => {
     const { usage } = await watch([
-      messageStart({ input_tokens: 0, output_tokens: 0 }),
+      messageStart({ input_tokens: 40, output_tokens: 0 }),
       messageDelta({ input_tokens: 31, output_tokens: 7 }),
     ]);
     expect(usage).toEqual({ usage: { inputTokens: 31, outputTokens: 7 }, costMicros: null });
@@ -93,7 +98,7 @@ describe("watchStreamUsage", () => {
     expect(text).toContain("not json");
   });
 
-  it("reports the usage seen so far when the source fails, and passes the failure on", async () => {
+  it("ends a failed source with an Anthropic error event and reports the drop with the usage so far", async () => {
     const dropped = new Error("connection reset");
     let pulls = 0;
     // Erroring in start() would discard the queued event, so the drop comes on the next pull.
@@ -108,8 +113,13 @@ describe("watchStreamUsage", () => {
       },
     });
     const { events, ended } = watchStreamUsage(source);
-    await expect(new Response(events).text()).rejects.toBe(dropped);
-    expect(await ended).toEqual({ usage: { inputTokens: 8, outputTokens: 1 }, costMicros: null });
+    const text = await new Response(events).text();
+    expect(text).toBe(messageStart({ input_tokens: 8, output_tokens: 1 }) + EXPECTED_DROPPED_EVENT);
+    expect(await ended).toEqual({
+      kind: "dropped",
+      usage: { usage: { inputTokens: 8, outputTokens: 1 }, costMicros: null },
+      cause: dropped,
+    });
   });
 
   it("reports the usage seen so far when the reader cancels, and cancels the source", async () => {
@@ -126,7 +136,10 @@ describe("watchStreamUsage", () => {
     const reader = events.getReader();
     await reader.read();
     await reader.cancel();
-    expect(await ended).toEqual({ usage: { inputTokens: 8, outputTokens: 1 }, costMicros: null });
+    expect(await ended).toEqual({
+      kind: "cancelled",
+      usage: { usage: { inputTokens: 8, outputTokens: 1 }, costMicros: null },
+    });
     expect(sourceCancelled).toBe(true);
   });
 });

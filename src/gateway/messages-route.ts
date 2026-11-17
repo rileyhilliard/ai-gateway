@@ -8,11 +8,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
 import type { Employee } from "../budget/types.ts";
-import type { Logger } from "../logging.ts";
+import { describeCause, describeFailure, type Logger } from "../logging.ts";
 import { createRouter } from "../router.ts";
 import { anthropicErrorResponse } from "./anthropic-errors.ts";
 import { authenticate } from "./authenticate.ts";
-import { type GatewayDeps, handleMessage } from "./service.ts";
+import { type GatewayDeps, handleMessage, type StreamSettlement } from "./service.ts";
 
 // Loose, because every other Messages field (messages, max_tokens, system, tools) is forwarded
 // to the provider as sent. The gateway itself only needs the model.
@@ -55,14 +55,13 @@ export function messagesRoutes(deps: GatewayDeps, logger: Logger) {
       body: c.req.valid("json"),
       headers: c.req.header(),
     });
+    // A raw Response skips the headers middleware set on the context, so the request id the
+    // client quotes to an admin is added by hand.
+    const requestId = c.get("requestId");
     if (upstream.kind === "stream") {
-      const requestId = c.get("requestId");
-      // The response has started, so a failed charge can't change it; it is logged here, once.
-      upstream.usageRecorded.catch((error: unknown) => {
-        logger.error({ requestId, ...describeError(error) }, "usage not recorded");
-      });
-      // A raw Response skips the headers middleware set on the context, so the request id that
-      // the failure log above carries is added here for the client to quote.
+      // The response has started by the time the stream settles, so what went wrong can only be
+      // logged. `settled` never rejects.
+      void upstream.settled.then((settlement) => logSettlement(logger, requestId, settlement));
       return new Response(upstream.events, {
         status: upstream.status,
         headers: {
@@ -76,16 +75,27 @@ export function messagesRoutes(deps: GatewayDeps, logger: Logger) {
     const isText = typeof upstream.body === "string";
     return new Response(isText ? String(upstream.body) : JSON.stringify(upstream.body), {
       status: upstream.status,
-      headers: { "content-type": isText ? "text/plain; charset=utf-8" : "application/json" },
+      headers: {
+        "content-type": isText ? "text/plain; charset=utf-8" : "application/json",
+        "x-request-id": requestId,
+      },
     });
   });
 }
 
-/** The class and stack of a failure for the log; like app.onError, it leaves the message out. */
-function describeError(error: unknown): { errorClass: string; stack?: string } {
-  if (!(error instanceof Error)) return { errorClass: typeof error };
-  return {
-    errorClass: error.constructor.name,
-    stack: error.stack?.split("\n").slice(1).join("\n"),
-  };
+/**
+ * Logs what went wrong with a finished stream, once each: a provider drop as a warning (the
+ * client got an error event and can retry), and a lost charge as an error with the whole record,
+ * so it can be added back by hand.
+ */
+function logSettlement(logger: Logger, requestId: string, { end, recording }: StreamSettlement) {
+  if (end.kind === "dropped") {
+    logger.warn({ requestId, cause: describeCause(end.cause) }, "upstream stream dropped");
+  }
+  if (recording.kind === "failed") {
+    logger.error(
+      { requestId, record: recording.record, ...describeFailure(recording.cause) },
+      "usage not recorded",
+    );
+  }
 }

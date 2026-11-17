@@ -6,12 +6,7 @@
 
 import type { TokenUsage } from "../budget/types.ts";
 import { UpstreamUnavailableError } from "../errors.ts";
-import type {
-  StreamingUpstream,
-  UpstreamRequest,
-  UpstreamResponse,
-  UpstreamStream,
-} from "./types.ts";
+import type { Upstream, UpstreamRequest, UpstreamResponse, UpstreamStream } from "./types.ts";
 
 const DEFAULT_INPUT_TOKENS = 1000;
 const DEFAULT_OUTPUT_TOKENS = 500;
@@ -142,7 +137,7 @@ function eventStream(events: string[], dropAfter: number): ReadableStream<Uint8A
  * @throws {UpstreamUnavailableError} From `send` and `stream`, when the request has
  * `x-fake-unreachable: 1`. A stream with `x-fake-drop-after: <n>` errors after n events.
  */
-export function createFakeUpstream(): StreamingUpstream {
+export function createFakeUpstream(): Upstream {
   let messageCount = 0;
 
   /** What the headers ask for, after their delay: an error response or a message to send. */
