@@ -1,6 +1,6 @@
 # Phase 4: Anthropic-shaped errors for real clients
 
-Status: scaffolded on `build/spend-gateway-p4` (worktree `.claude/worktrees/phase-4`); one lane running.
+Status: done, tagged `phase-4`.
 Shared spec, error model and contracts: [spec.md](spec.md). Overview and phase status: [README.md](README.md).
 
 Demo: send the error requests in `http/gateway.http` and see `{ "type": "error", "error": { "type": "rate_limit_error", ... } }`. An Anthropic SDK client pointed at the gateway raises its typed errors (`RateLimitError`, `AuthenticationError`) with our message, and doesn't retry a budget block.
@@ -30,3 +30,7 @@ Defaults taken without a grill round; override any of them.
 | Lane | Size | Owns files | Model |
 | --- | --- | --- | --- |
 | a | S | `src/gateway/anthropic-errors.ts`, `src/app.ts` (`notFound` and `onError` pick the shape by path), `src/gateway/messages-route.ts` (error responses documented with `anthropicErrorResponse`), `http/gateway.http` (comments name the new types) | sonnet |
+
+## Log
+
+- Lane a (sonnet) landed clean. Accepted choices: one `renderError(c, error)` for `notFound` and `onError`; the `/v1/` prefix is a named constant; `.http` comments read "type (code x)".
