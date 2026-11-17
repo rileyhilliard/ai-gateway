@@ -12,7 +12,8 @@ Run these from the repo root. They are the only supported way to build, test, an
 
 | Command | What it does |
 | --- | --- |
-| `bun run dev` | Run the server from source on Node, restarting on change, with readable logs |
+| `bun run dev` | Check the API port is free, then run the gateway and the dashboard (`web/`) together and open the dashboard; Ctrl-C stops both |
+| `bun run dev:api` | Run only the gateway from source on Node, restarting on change, with readable logs |
 | `bun run build` | Bundle the server into dist/main.js |
 | `bun run start` | Run the built server |
 | `bun run typecheck` | Run tsc over the app, tests and tooling |
@@ -21,7 +22,7 @@ Run these from the repo root. They are the only supported way to build, test, an
 | `bun run test` | Run Vitest once |
 | `bun run test:watch` | Watch Vitest tests |
 | `bun run coverage` | Run Vitest with coverage thresholds |
-| `bun run check` | Run lint, typecheck, tests and the build |
+| `bun run check` | Run lint, typecheck, tests and the build, then the dashboard's lint, typecheck and tests |
 | `bun run clean` | Remove build and coverage output |
 | `bun run prepare` | Install git hooks outside CI |
 | `bun install` | Install dependencies |
@@ -33,18 +34,24 @@ The gate is `bun run check` (about 4s).
 
 ```
 src/        the app: main.ts and server.ts touch Node; app.ts builds a platform-free fetch handler
-  budget/   pure budget rules (periods, pricing, limits, spend sums, the allow/spill/block decision)
+  budget/   pure budget rules (periods, money, pricing, limits, spend sums, the allow/spill/block decision)
   store/    Store interface and the in-memory implementation
   seed/     seed JSON validation
   upstream/ fake and OpenRouter upstreams
-  gateway/  POST /v1/messages: key, decide, forward, record
-tests/      HTTP contract and server tests, plus helpers
+  gateway/  POST /v1/messages: key, decide, forward, record; streaming and Anthropic-shaped errors
+  admin/    admin API behind x-admin-key: usage report, budget changes, demo clock
+  reports/  the usage report
+  clock/    the demo clock
+  routes/   the health probe
+web/        the executive spend dashboard (React on Vite); its own AGENTS.md
+scripts/    bun dev (port check, then gateway and dashboard together)
+tests/      HTTP contract, server, startup and dev-port tests, plus helpers
 http/       REST Client requests for manual testing
 seed/       demo company data
 plans/      build plan, one file per phase
 ```
 
-A request flows: route, gateway service, store and budget decision, upstream, usage record. The `budget/`, `store/`, `seed/`, `upstream/` and `gateway/` folders are created by the phase 1 scaffold; see [the spec](plans/spend-gateway/spec.md) for each module's responsibility.
+A request flows: route, gateway service, store and budget decision, upstream, usage record. [src/README.md](src/README.md) maps every folder, and the larger ones have their own README; [the spec](plans/spend-gateway/spec.md) has the contracts.
 
 ## Agent harness
 
@@ -110,7 +117,7 @@ Read [error handling](docs/guidance/engineering/errors.md) before changing failu
 - If a fix hasn't worked after two attempts with no new diagnostic step in between, stop. Write down what you learned, list two or three other root-cause hypotheses, and ask which to pursue. Running a new diagnostic between attempts resets the count.
 - Read logs and error output before guessing.
 
-`bun run dev` logs pino JSON through pino-pretty to the terminal. Set `LOG_LEVEL=debug` for more.
+`bun run dev` (and `bun run dev:api`) logs pino JSON through pino-pretty to the terminal. Set `LOG_LEVEL=debug` for more.
 
 ## Build workarounds
 

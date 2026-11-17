@@ -1,14 +1,5 @@
-# HTTP routes
+# Health route
 
-Start with [notes.ts](notes.ts) for the versioned list, get and create endpoints.
-Each declaration combines request and response schemas from `../schemas/notes.ts`
-with a handler using the injected `NotesStore`. Persistence lives in
-[../services/notes.ts](../services/notes.ts).
+[health.ts](health.ts) declares `GET /healthz`, which answers `{"status":"ok"}` while the process is up. It reads no state, so a load balancer can probe it without a key. The request logger records it at debug level to keep probes out of the info log.
 
-[health.ts](health.ts) declares the unversioned health probe.
-[../app.ts](../app.ts) mounts both routers and publishes their OpenAPI document.
-Every router comes from [../router.ts](../router.ts), whose validation hook
-turns rejected input into the shared error envelope.
-
-`../../tests/http-contract.test.ts` checks these endpoints through the real app.
-
+Feature routes live with their features: `../gateway/messages-route.ts` and `../admin/`. [../app.ts](../app.ts) mounts them all.

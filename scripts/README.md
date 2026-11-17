@@ -1,13 +1,7 @@
 # Development scripts
 
-[prepare.ts](prepare.ts) runs during dependency installation. It installs
-lefthook hooks only when `lefthook.yml` exists outside CI, so it does not create
-an example hook configuration. An unavailable installer is reported without
-failing `bun install`.
+[dev.ts](dev.ts) is `bun run dev`: it checks the gateway's port is free ([dev-port.ts](dev-port.ts)), then starts the gateway (`bun run dev:api`) and the dashboard's Vite dev server (`web/`) together and opens the browser. Ctrl-C stops both, and if either exits the other is stopped too. `../tests/dev-port.test.ts` covers the port check.
 
-`check-file-headers.sh` supplies the `file-headers` hygiene check for source under
-`src/`, `scripts/` and `tests/`. It reports missing file-level comments; folder
-reading guides remain an authoring judgment.
+[prepare.ts](prepare.ts) runs during dependency installation. It installs lefthook hooks only when `lefthook.yml` exists outside CI; this repo has none, so it does nothing. An unavailable installer is reported without failing `bun install`.
 
 The package scripts invoke these files from the project root.
-

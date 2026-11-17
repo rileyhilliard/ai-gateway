@@ -1,6 +1,7 @@
 /**
  * Validates environment settings: port, log level, request-body limit, the seed file, the
- * OpenRouter key, the admin key and the demo clock switch. The process entry loads these values before building the app.
+ * OpenRouter key, the admin key and the demo clock switch. The process entry loads these values
+ * before building the app, and exits naming any bad variable.
  */
 
 import { z } from "@hono/zod-openapi";

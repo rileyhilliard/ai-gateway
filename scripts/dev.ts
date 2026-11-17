@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 /**
  * `bun dev`: runs the gateway (`bun run dev:api`) and the dashboard's Vite dev server together,
- * opening the dashboard in the browser. Ctrl-C stops both, and if either one exits the other is
- * stopped too, so a crashed gateway never leaves an orphaned dev server (or the reverse).
+ * opening the dashboard in the browser. It first checks the gateway's port is free and starts
+ * nothing if it isn't. Ctrl-C stops both, and if either one exits the other is stopped too, so a
+ * crashed gateway never leaves an orphaned dev server (or the reverse).
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
