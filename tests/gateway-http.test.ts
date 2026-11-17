@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ErrorEnvelope } from "../src/errors.ts";
+import { AnthropicErrorBody } from "../src/gateway/anthropic-errors.ts";
 import { createMemoryStore } from "../src/store/memory.ts";
 import type { Upstream, UpstreamRequest } from "../src/upstream/types.ts";
 import { demoContents, jsonBody, testApp, testGateway } from "./helpers/app.ts";
@@ -32,8 +32,9 @@ const post = (
 const recordsOf = (gateway: ReturnType<typeof testGateway>) =>
   gateway.store.listUsageSince("acme", new Date(0));
 
+/** The `error` object of a gateway error, which must be in Anthropic's shape. */
 async function errorOf(res: Response) {
-  return ErrorEnvelope.parse(await res.json()).error;
+  return AnthropicErrorBody.parse(await res.json()).error;
 }
 
 /** An OpenRouter stand-in that remembers what it was sent and answers with a fixed response. */
@@ -157,6 +158,7 @@ describe("budget outcomes", () => {
     const res = await post(app, "key-intern", costly);
     expect(res.status).toBe(429);
     expect(await errorOf(res)).toMatchObject({
+      type: "rate_limit_error",
       code: "budget_exceeded",
       message: `Daily allowance of $0.01 used. Resets ${TOMORROW}.`,
       budget: {

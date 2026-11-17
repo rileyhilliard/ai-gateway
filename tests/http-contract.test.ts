@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ErrorEnvelope, errorTable } from "../src/errors.ts";
+import { AnthropicErrorBody } from "../src/gateway/anthropic-errors.ts";
 import type { Store } from "../src/store/types.ts";
 import { jsonBody, testApp, testGateway } from "./helpers/app.ts";
 
@@ -15,6 +16,17 @@ const message = {
   messages: [{ role: "user", content: "hi" }],
 };
 const withKey = { "x-api-key": "key-staff" };
+
+/** Checks a `/v1/*` error: Anthropic's shape, with the gateway's code and the table's message. */
+async function expectAnthropicError(res: Response, code: keyof typeof errorTable) {
+  expect(res.status).toBe(errorTable[code].status);
+  expect(res.headers.get("content-type")).toMatch(/^application\/json/);
+  const body = AnthropicErrorBody.parse(await res.json());
+  expect(body.error.code).toBe(code);
+  expect(body.error.message).toBe(errorTable[code].message);
+  expect(body.request_id).toBe(res.headers.get("x-request-id"));
+  return body;
+}
 
 async function expectEnvelope(res: Response, code: keyof typeof errorTable) {
   expect(res.status).toBe(errorTable[code].status);
@@ -68,42 +80,44 @@ describe("health and the OpenAPI document", () => {
 });
 
 describe("errors", () => {
-  it("malformed JSON from a valid key is the 400 envelope", async () => {
+  it("malformed JSON from a valid key is a 400 in Anthropic's shape", async () => {
     const { app } = testApp();
     const res = await app.request("/v1/messages", {
       method: "POST",
       headers: { "content-type": "application/json", ...withKey },
       body: "{not json",
     });
-    await expectEnvelope(res, "bad_request");
+    await expectAnthropicError(res, "bad_request");
   });
 
-  it("a body that isn't JSON is the 415 envelope", async () => {
+  it("a body that isn't JSON is a 415 in Anthropic's shape", async () => {
     const { app } = testApp();
     const res = await app.request("/v1/messages", {
       method: "POST",
       headers: { "content-type": "text/plain", ...withKey },
       body: "model=fake/model",
     });
-    await expectEnvelope(res, "unsupported_media_type");
+    await expectAnthropicError(res, "unsupported_media_type");
   });
 
-  it("a body over the limit is the 413 envelope", async () => {
+  it("a body over the limit is a 413 in Anthropic's shape", async () => {
     const { app } = testApp({ maxBodyBytes: 64 });
     const res = await app.request(
       "/v1/messages",
       jsonBody({ ...message, pad: "x".repeat(200) }, withKey),
     );
-    await expectEnvelope(res, "payload_too_large");
+    await expectAnthropicError(res, "payload_too_large");
   });
 
   it.each([
-    ["an unknown path", "GET", "/nope"],
-    ["a wrong method", "GET", "/v1/messages"],
-  ])("%s is the 404 envelope with one request record", async (_, method, path) => {
+    ["an unknown path", "GET", "/nope", expectEnvelope],
+    ["an unknown admin path", "GET", "/admin/nope", expectEnvelope],
+    ["a wrong method on a /v1 path", "GET", "/v1/messages", expectAnthropicError],
+    ["an unknown /v1 path", "POST", "/v1/complete", expectAnthropicError],
+  ])("%s is a 404 with one request record", async (_, method, path, expectError) => {
     const { app, requests } = testApp();
     const res = await app.request(path, { method });
-    await expectEnvelope(res, "not_found");
+    await expectError(res, "not_found");
     expect(requests()).toHaveLength(1);
     expect(requests()[0]).toMatchObject({ status: 404 });
   });
@@ -124,10 +138,10 @@ describe("errors", () => {
     };
     const { app, records } = testApp({ gateway: testGateway({ store: failing }) });
     const res = await app.request("/v1/messages", jsonBody(message, withKey));
-    const envelope = await expectEnvelope(res, "internal");
+    const envelope = await expectAnthropicError(res, "internal");
     expect(JSON.stringify(envelope)).not.toContain("hunter2");
     const logged = records.find((record) => record.msg === "unhandled error");
-    expect(logged).toMatchObject({ errorClass: "TypeError", requestId: envelope.error.requestId });
+    expect(logged).toMatchObject({ errorClass: "TypeError", requestId: envelope.request_id });
     expect(JSON.stringify(records)).not.toContain("hunter2");
   });
 });

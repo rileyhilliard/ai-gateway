@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ErrorEnvelope } from "../src/errors.ts";
+import { AnthropicErrorBody } from "../src/gateway/anthropic-errors.ts";
 import { ADMIN_KEY, jsonBody, testApp, testGateway } from "./helpers/app.ts";
 
 type App = ReturnType<typeof testApp>["app"];
@@ -38,8 +39,9 @@ async function errorOf(res: Response) {
   return ErrorEnvelope.parse(await res.json()).error;
 }
 
+/** Why a gateway request was blocked. Gateway errors use Anthropic's shape. */
 async function blockReasonOf(res: Response) {
-  return (await errorOf(res)).budget?.reason;
+  return AnthropicErrorBody.parse(await res.json()).error.budget?.reason;
 }
 
 describe("admin key", () => {
