@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "projectId": "eff57cdb-92af-40f4-a3d8-c7aed7f56474",
+  "createdAt": "2026-11-17T18:02:43.278Z",
+  "cli": "0.14.1",
+  "mode": "new",
+  "name": "spend-dashboard",
+  "preset": "default",
+  "agents": [
+    "claude"
+  ],
+  "stack": {
+    "id": "react-vite",
+    "origin": "bundled",
+    "trusted": true
+  },
+  "fragments": [
+    {
+      "id": "agent-ops",
+      "origin": "bundled",
+      "trusted": true
+    },
+    {
+      "id": "claude-harness",
+      "origin": "bundled",
+      "trusted": true
+    }
+  ],
+  "env": {
+    "PORT_WEB": "4173"
+  },
+  "commands": {
+    "dev": "Run the Vite development server",
+    "build": "Build the static site into dist/",
+    "preview": "Serve dist/ locally, with index.html for unknown paths",
+    "typecheck": "Run tsc over the app, tests and configs",
+    "lint": "Run Biome checks, including the boundary plugin",
+    "format": "Apply Biome formatting and safe fixes",
+    "test": "Run Vitest once",
+    "test:watch": "Watch Vitest tests",
+    "coverage": "Run Vitest with coverage",
+    "e2e": "Build, then run the Playwright tests against vite preview",
+    "check": "Run lint, typecheck, tests and e2e",
+    "clean": "Remove build, test and coverage output",
+    "prepare": "Install git hooks and the Playwright browser outside CI"
+  },
+  "verify": [
+    {
+      "name": "install",
+      "run": "bun install",
+      "phase": "setup",
+      "tags": [],
+      "layer": "install",
+      "timeout": "10m",
+      "owner": "react-vite",
+      "skipByDefault": false
+    },
+    {
+      "name": "lint",
+      "run": "bun run lint",
+      "phase": "check",
+      "tags": [],
+      "layer": "lint",
+      "timeout": "10m",
+      "owner": "react-vite",
+      "skipByDefault": false
+    },
+    {
+      "name": "typecheck",
+      "run": "bun run typecheck",
+      "phase": "check",
+      "tags": [],
+      "layer": "typecheck",
+      "timeout": "10m",
+      "owner": "react-vite",
+      "skipByDefault": false
+    },
+    {
+      "name": "test",
+      "run": "bun run test",
+      "phase": "check",
+      "tags": [],
+      "layer": "test",
+      "timeout": "10m",
+      "owner": "react-vite",
+      "skipByDefault": false
+    },
+    {
+      "name": "build",
+      "run": "bun run build",
+      "phase": "check",
+      "tags": [],
+      "layer": "build",
+      "timeout": "10m",
+      "owner": "react-vite",
+      "skipByDefault": false
+    },
+    {
+      "name": "e2e",
+      "run": "bun run e2e",
+      "phase": "check",
+      "tags": [],
+      "layer": "test",
+      "timeout": "10m",
+      "owner": "react-vite",
+      "skipByDefault": false
+    },
+    {
+      "name": "web",
+      "run": "bun run preview --port ${PORT_WEB} --strictPort",
+      "phase": "serve",
+      "tags": [],
+      "expect": {
+        "http": "http://localhost:${PORT_WEB}/",
+        "within": "60s"
+      },
+      "layer": "serve",
+      "timeout": "10m",
+      "owner": "react-vite",
+      "skipByDefault": false
+    },
+    {
+      "name": "readme-filled",
+      "run": "test -s README.md && ! grep -n 'stacks:fill' README.md",
+      "phase": "check",
+      "tags": [
+        "hygiene"
+      ],
+      "layer": "check",
+      "timeout": "10m",
+      "owner": "react-vite",
+      "skipByDefault": false
+    },
+    {
+      "name": "agents-md-filled",
+      "run": "test -s AGENTS.md && grep -q '^## Commands' AGENTS.md && ! grep -n 'stacks:fill' AGENTS.md",
+      "phase": "check",
+      "tags": [
+        "hygiene"
+      ],
+      "layer": "check",
+      "timeout": "10m",
+      "owner": "agent-ops",
+      "skipByDefault": false
+    },
+    {
+      "name": "claude-md-imports-agents",
+      "run": "test ! -f CLAUDE.md || grep -qx '@AGENTS.md' CLAUDE.md",
+      "phase": "check",
+      "tags": [
+        "hygiene"
+      ],
+      "layer": "check",
+      "timeout": "10m",
+      "owner": "agent-ops",
+      "skipByDefault": false
+    },
+    {
+      "name": "claude-readme-filled",
+      "run": "test ! -f .claude/README.md || ! grep -n 'stacks:fill' .claude/README.md",
+      "phase": "check",
+      "tags": [
+        "hygiene"
+      ],
+      "layer": "check",
+      "timeout": "10m",
+      "owner": "agent-ops",
+      "skipByDefault": false
+    },
+    {
+      "name": "hooks-smoke",
+      "run": "bash .claude/hooks/smoke.sh",
+      "phase": "check",
+      "tags": [
+        "hygiene"
+      ],
+      "layer": "check",
+      "timeout": "10m",
+      "owner": "agent-ops",
+      "skipByDefault": false
+    }
+  ],
+  "verifyDigest": "sha256:552b42b021264780cbd73c202ae071dd7a59b1458391d3bae6d2479b40f3536d",
+  "briefWords": 2904,
+  "handoff": {
+    "kind": "inside-agent",
+    "agent": "claude",
+    "at": "2026-11-17T18:02:43.278Z"
+  },
+  "fingerprint": "sha256:11c3133084bb46996f25e1682c2cfe6feef256c9bbb959a9c88e9479b22fa5ac"
+}
