@@ -27,6 +27,27 @@ export function nextWeekStart(at: Date): Date {
   return addUtcDays(weekStart(at), DAYS_PER_WEEK);
 }
 
+/** A half-open time window: `start` is inside it, `end` is not. */
+export type Period = { start: Date; end: Date };
+
+/** The UTC day containing `now`. */
+export function today(now: Date): Period {
+  return { start: dayStart(now), end: nextDayStart(now) };
+}
+
+/** The Monday-to-Monday UTC week containing `now`. */
+export function thisWeek(now: Date): Period {
+  return { start: weekStart(now), end: nextWeekStart(now) };
+}
+
+/**
+ * Whether `at` falls inside `period`. The end bound matters when the clock is set back: an
+ * instant after now belongs to a later period.
+ */
+export function isWithin(at: Date, period: Period): boolean {
+  return at >= period.start && at < period.end;
+}
+
 /** The UTC midnight `days` calendar days from `midnight`. Date.UTC rolls over months and years. */
 function addUtcDays(midnight: Date, days: number): Date {
   return new Date(

@@ -1,12 +1,13 @@
 /**
  * The usage view: for every employee, today's personal spend against their allowance, this
  * week's pool draws against their cap, and this week's blocked requests, plus company spend
- * against the weekly pool and this week's spend per project tag. Pure: it reads only its input, and reuses the budget module's sums
- * and limits so the view always agrees with the decisions the gateway made.
+ * against the weekly pool and this week's spend per project tag. Pure: it reads only its input,
+ * and reuses the budget module's periods, sums and limits so the view always agrees with the
+ * decisions the gateway made.
  */
 
 import { effectiveLimits } from "../budget/limits.ts";
-import { nextDayStart, nextWeekStart, weekStart } from "../budget/periods.ts";
+import { isWithin, nextDayStart, nextWeekStart, thisWeek } from "../budget/periods.ts";
 import {
   blockedRequestsThisWeek,
   companySpendThisWeek,
@@ -127,12 +128,11 @@ function employeeUsage(employee: Employee, input: UsageReportInput): EmployeeUsa
 /** This week's records for the company, grouped by project tag and sorted for display. */
 function projectUsage(usage: readonly UsageRecord[], companyId: string, now: Date): ProjectUsage[] {
   // The same week bounds as the company total, so project spend adds up to it.
-  const start = weekStart(now);
-  const end = nextWeekStart(now);
+  const week = thisWeek(now);
   const rowsByTag = new Map<string | null, ProjectUsage>();
   for (const record of usage) {
     if (record.companyId !== companyId) continue;
-    if (record.startedAt < start || record.startedAt >= end) continue;
+    if (!isWithin(record.startedAt, week)) continue;
     const row = rowsByTag.get(record.projectTag) ?? emptyProjectRow(record.projectTag);
     rowsByTag.set(record.projectTag, addRecord(row, record));
   }

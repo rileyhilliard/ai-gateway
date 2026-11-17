@@ -4,7 +4,15 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { dayStart, nextDayStart, nextWeekStart, weekStart } from "./periods.ts";
+import {
+  dayStart,
+  isWithin,
+  nextDayStart,
+  nextWeekStart,
+  thisWeek,
+  today,
+  weekStart,
+} from "./periods.ts";
 
 const at = (iso: string) => new Date(iso);
 
@@ -40,6 +48,16 @@ describe("weeks", () => {
     expect(weekStart(newYearsDay)).toEqual(at("2026-12-28T00:00:00.000Z"));
     expect(nextWeekStart(newYearsDay)).toEqual(at("2027-01-04T00:00:00.000Z"));
     expect(nextDayStart(at("2026-12-31T23:00:00.000Z"))).toEqual(at("2027-01-01T00:00:00.000Z"));
+  });
+});
+
+describe("windows", () => {
+  it("includes the start of today and this week but not the start of the next", () => {
+    const now = at("2026-11-18T12:00:00.000Z");
+    expect(isWithin(at("2026-11-18T00:00:00.000Z"), today(now))).toBe(true);
+    expect(isWithin(at("2026-11-19T00:00:00.000Z"), today(now))).toBe(false);
+    expect(isWithin(at("2026-11-16T00:00:00.000Z"), thisWeek(now))).toBe(true);
+    expect(isWithin(at("2026-11-23T00:00:00.000Z"), thisWeek(now))).toBe(false);
   });
 });
 

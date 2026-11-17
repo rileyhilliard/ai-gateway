@@ -1,10 +1,9 @@
 /**
- * The spend sums the budget rules compare against limits, plus the per-employee weekly total
- * the usage report shows. Only allowed records count;
- * blocked records have zero cost and never add to a sum.
+ * The spend sums the budget rules compare against limits, plus the per-employee weekly totals
+ * the usage report shows. Only allowed records count toward a sum; blocked records cost nothing.
  */
 
-import { dayStart, nextDayStart, nextWeekStart, weekStart } from "./periods.ts";
+import { isWithin, type Period, thisWeek, today } from "./periods.ts";
 import type { Micros, UsageRecord } from "./types.ts";
 
 /** Everything the company spent this week, from either bucket. */
@@ -60,25 +59,13 @@ export function blockedRequestsThisWeek(
   const week = thisWeek(now);
   return records.filter(
     (record) =>
-      record.status === "blocked" && record.employeeId === employeeId && isIn(record, week),
+      record.status === "blocked" &&
+      record.employeeId === employeeId &&
+      isWithin(record.startedAt, week),
   ).length;
 }
 
-/** A half-open time window: `start` is inside it, `end` is not. */
-type Period = { start: Date; end: Date };
-
-function today(now: Date): Period {
-  return { start: dayStart(now), end: nextDayStart(now) };
-}
-
-function thisWeek(now: Date): Period {
-  return { start: weekStart(now), end: nextWeekStart(now) };
-}
-
-/**
- * Sums the cost of allowed records that match and started inside `period`. The end bound
- * matters when the clock is set back: records dated after now belong to a later period.
- */
+/** Sums the cost of allowed records that match and started inside `period`. */
 function sumAllowedCostsIn(
   records: readonly UsageRecord[],
   period: Period,
@@ -87,13 +74,9 @@ function sumAllowedCostsIn(
   let total = 0;
   for (const record of records) {
     if (record.status !== "allowed") continue;
-    if (!isIn(record, period)) continue;
+    if (!isWithin(record.startedAt, period)) continue;
     if (!matches(record)) continue;
     total += record.costMicros;
   }
   return total;
-}
-
-function isIn(record: UsageRecord, period: Period): boolean {
-  return record.startedAt >= period.start && record.startedAt < period.end;
 }
