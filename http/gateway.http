@@ -1,0 +1,120 @@
+# Spend gateway: phase 1 requests for the VS Code REST Client extension.
+# Start the server with `bun run dev`, pick the "local" environment, and send these top to bottom.
+# Budgets live in memory, so restart the server to replay the allow, spill and block sequence.
+# fake/model requests go to the in-process fake upstream and cost nothing real. Header
+# x-fake-output-tokens: 10000 makes a request cost $0.011, just over the $0.01 daily allowance.
+
+### Health check. Expect 200 {"status":"ok"}.
+# @name health
+GET {{baseUrl}}/healthz
+
+### Staff, under their $0.05 allowance. Expect 200 with "Fake reply.", charged to personal.
+# @name staffAllowed
+POST {{baseUrl}}/v1/messages
+x-api-key: {{staffKey}}
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Intern, first costly request. Expect 200: allowed from personal, spending $0.011 of $0.01.
+# @name internFirst
+POST {{baseUrl}}/v1/messages
+x-api-key: {{internKey}}
+x-fake-output-tokens: 10000
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Intern again. Expect 429 budget_exceeded, reason personal_allowance_exhausted, resets next 00:00 UTC.
+# @name internBlocked
+POST {{baseUrl}}/v1/messages
+x-api-key: {{internKey}}
+x-fake-output-tokens: 10000
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Engineer, first costly request. Expect 200, charged to personal.
+# @name engineerPersonal
+POST {{baseUrl}}/v1/messages
+x-api-key: {{engineerKey}}
+x-fake-output-tokens: 10000
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Engineer again. Expect 200: allowance used, so this spills to the company pool.
+# @name engineerSpill1
+POST {{baseUrl}}/v1/messages
+x-api-key: {{engineerKey}}
+x-fake-output-tokens: 10000
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Engineer a third time. Expect 200: pool draws are $0.011 of the $0.02 weekly cap.
+# @name engineerSpill2
+POST {{baseUrl}}/v1/messages
+x-api-key: {{engineerKey}}
+x-fake-output-tokens: 10000
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Engineer a fourth time. Expect 429, reason pool_cap_reached, resets next 00:00 UTC when the allowance refills.
+# @name engineerCapped
+POST {{baseUrl}}/v1/messages
+x-api-key: {{engineerKey}}
+x-fake-output-tokens: 10000
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### No key. Expect 401 unauthorized.
+# @name noKey
+POST {{baseUrl}}/v1/messages
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Disabled employee. Expect 401 unauthorized, the same as an unknown key.
+# @name disabledKey
+POST {{baseUrl}}/v1/messages
+x-api-key: {{disabledKey}}
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### A model the gateway has no price for. Expect 400 unknown_model; nothing is forwarded.
+# @name unknownModel
+POST {{baseUrl}}/v1/messages
+x-api-key: {{staffKey}}
+content-type: application/json
+
+{ "model": "openai/gpt-unknown", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### No model at all. Expect 400 bad_request with an issue at json.model.
+# @name missingModel
+POST {{baseUrl}}/v1/messages
+x-api-key: {{staffKey}}
+content-type: application/json
+
+{ "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### The provider fails without reporting usage. Expect the provider's 529 passed through, and no charge.
+# @name upstreamError
+POST {{baseUrl}}/v1/messages
+x-api-key: {{staffKey}}
+x-fake-status: 529
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Real inference through OpenRouter (needs OPENROUTER_KEY in .env). Expect 200 with a real reply.
+# @name realInference
+POST {{baseUrl}}/v1/messages
+x-api-key: {{staffKey}}
+anthropic-version: 2023-06-01
+content-type: application/json
+
+{ "model": "deepseek/deepseek-v4.1-flash-1017", "max_tokens": 64, "messages": [{ "role": "user", "content": "Say hello in five words." }] }

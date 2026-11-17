@@ -4,6 +4,7 @@
  */
 
 import type { Employee } from "../budget/types.ts";
+import { UnauthorizedError } from "../errors.ts";
 import type { Store } from "../store/types.ts";
 
 /**
@@ -13,5 +14,9 @@ import type { Store } from "../store/types.ts";
  * disabled.
  */
 export async function authenticate(store: Store, apiKey: string | undefined): Promise<Employee> {
-  throw new Error("not implemented");
+  if (!apiKey) throw new UnauthorizedError();
+  const employee = await store.findEmployeeByKey(apiKey);
+  // Unknown and disabled look the same to the caller, so the 401 doesn't reveal which keys exist.
+  if (!employee || employee.disabled) throw new UnauthorizedError();
+  return employee;
 }
