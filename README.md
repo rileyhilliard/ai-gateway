@@ -34,7 +34,7 @@ Open `.env` and set these:
 | `DEMO_CLOCK` | `1` (optional) | Lets you move the gateway's clock forward, so you can watch daily allowances refill without waiting for midnight UTC. |
 | `OPENROUTER_KEY` | your key (optional) | Real inference through OpenRouter. Without it, real model ids get a 502 and `fake/` models work as usual. |
 
-`PORT_API` (default 3000) moves the gateway to another port if 3000 is taken.
+`PORT_API` (default 3000) moves the gateway to another port if 3000 is taken. `MAX_BODY_BYTES` (default 10485760, 10 MB) is the largest request body before a 413; Claude Code's requests need well over 64 KB.
 
 ## Run it
 

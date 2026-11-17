@@ -11,7 +11,7 @@ describe("loadConfig", () => {
     expect(loadConfig({})).toEqual({
       port: 3000,
       logLevel: "info",
-      maxBodyBytes: 65_536,
+      maxBodyBytes: 10_485_760,
       seedPath: "seed/company.json",
       openRouterKey: undefined,
       adminKey: undefined,
