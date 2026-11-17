@@ -5,7 +5,7 @@
 # x-fake-output-tokens: 10000 makes a request cost $0.011, just over the $0.01 daily allowance.
 
 # Demo values from seed/company.json. The OpenRouter key stays server-side in .env.
-@baseUrl = http://localhost:3000
+@baseUrl = http://localhost:3001
 @internKey = key-intern
 @engineerKey = key-engineer
 @staffKey = key-staff
