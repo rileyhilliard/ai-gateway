@@ -20,7 +20,7 @@ Product spec: [problem-statement.md](../../problem-statement.md). Build spec, er
 | [4](phase-4-anthropic-errors.md) | Anthropic-shaped errors for real clients | 1 | done (`phase-4`) | |
 | [5](phase-5-streaming.md) | Streaming, so Claude Code works through the gateway | 4 | running (lane a, opus) | |
 | [6](phase-6-percent-of-pool.md) | Percent-of-pool allowances | 3 | done (`phase-6`) | |
-| [7](phase-7-project-tags.md) | Project tags and spend by project | 2 | running (lane a, opus) | |
+| [7](phase-7-project-tags.md) | Project tags and spend by project | 2 | done (`phase-7`) | |
 
 Phase 1 has full lane briefs and test cases. Later phases get theirs while the phase before them runs. Not planned in detail: configurable reset periods and time zones, coding vs prototyping categories.
 

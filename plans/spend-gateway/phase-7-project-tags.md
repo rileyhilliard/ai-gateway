@@ -1,6 +1,6 @@
 # Phase 7: project tags and spend by project
 
-Status: lane a (opus) running from seam `727bece`.
+Status: done, tagged `phase-7`.
 Shared spec, error model and contracts: [spec.md](spec.md). Overview and phase status: [README.md](README.md).
 
 Depends on: phase 2. The gateway half landed in the seam: `x-project` (trimmed, blank is none, over 64 characters is a 400) is stored as `UsageRecord.projectTag` and isn't forwarded.
@@ -27,3 +27,7 @@ Tests first, then code. Cases, by name:
 Add a short tagged-request example to `http/admin.http` (or note in its comments that `x-project` goes on gateway requests).
 
 Gate: `bun run check` (about 5 s) before reporting. Commit as `phase 7 lane a: spend by project in the usage view`.
+
+## Log
+
+- Lane a (opus) landed clean. Accepted choices: week bounds from `periods.ts` (spend.ts doesn't export its period helpers), records filtered by company like the company total, code-point tag order on ties, `requests` counts allowed records only; one extra test that the OpenAPI schema carries `projects`.
