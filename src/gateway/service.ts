@@ -16,7 +16,7 @@ import type {
   TokenUsage,
   UsageRecord,
 } from "../budget/types.ts";
-import { BudgetExceededError, UnknownModelError } from "../errors.ts";
+import { BadRequestError, BudgetExceededError, UnknownModelError } from "../errors.ts";
 import type { Store } from "../store/types.ts";
 import { selectUpstream, type Upstreams } from "../upstream/select.ts";
 
@@ -46,11 +46,14 @@ const HEADERS_NOT_FORWARDED = new Set([
   "host",
   "content-length",
   "connection",
+  "x-project",
 ]);
+const MAX_PROJECT_TAG_LENGTH = 64;
 
 /**
  * Handles one request after authentication.
  *
+ * @throws {BadRequestError} When the x-project tag is too long. Nothing is recorded.
  * @throws {UnknownModelError} When the model has no price. Nothing is recorded.
  * @throws {BudgetExceededError} When a budget rule blocks the request. A blocked record is written.
  * @throws {UpstreamUnavailableError} When the upstream can't be reached. Nothing is recorded.
@@ -65,6 +68,7 @@ export async function handleMessage(
   // Taken once, before the upstream call, so a request that finishes after midnight still
   // counts toward the day it started.
   const startedAt = deps.clock();
+  const projectTag = projectTagOf(request.headers);
 
   const price = priceFor(deps.prices, body.model);
   if (!price) throw new UnknownModelError(body.model, Object.keys(deps.prices));
@@ -77,7 +81,7 @@ export async function handleMessage(
   const usage = await store.listUsageSince(company.id, weekStart(startedAt));
 
   const decision = decide({ company, tier, employee, usage, now: startedAt });
-  const base = { id: deps.newId(), employee, model: body.model, startedAt };
+  const base = { id: deps.newId(), employee, model: body.model, startedAt, projectTag };
   if (decision.kind === "block") {
     await store.addUsage(blockedRecord(base, decision));
     throw new BudgetExceededError(decision);
@@ -94,7 +98,13 @@ export async function handleMessage(
   return { status: response.status, body: response.body };
 }
 
-type RecordBase = { id: string; employee: Employee; model: string; startedAt: Date };
+type RecordBase = {
+  id: string;
+  employee: Employee;
+  model: string;
+  startedAt: Date;
+  projectTag: string | null;
+};
 
 function allowedRecord(
   base: RecordBase,
@@ -132,8 +142,27 @@ function recordFields(base: RecordBase) {
     employeeId: base.employee.id,
     model: base.model,
     startedAt: base.startedAt,
-    projectTag: null,
+    projectTag: base.projectTag,
   };
+}
+
+/**
+ * The request's project from the `x-project` header, trimmed. Blank or missing means no project.
+ *
+ * @throws {BadRequestError} When the tag is longer than 64 characters.
+ */
+function projectTagOf(headers: Record<string, string>): string | null {
+  const tag = headers["x-project"]?.trim() ?? "";
+  if (tag === "") return null;
+  if (tag.length > MAX_PROJECT_TAG_LENGTH) {
+    throw new BadRequestError([
+      {
+        path: "header.x-project",
+        message: `Project tag is ${tag.length} characters; the limit is ${MAX_PROJECT_TAG_LENGTH}. Use a shorter name.`,
+      },
+    ]);
+  }
+  return tag;
 }
 
 function forwardableHeaders(headers: Record<string, string>): Record<string, string> {

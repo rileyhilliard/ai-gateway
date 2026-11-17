@@ -33,7 +33,7 @@ export function decide(input: DecisionInput): Decision {
     };
   }
 
-  const limits = effectiveLimits(tier, employee.overrides);
+  const limits = effectiveLimits(tier, employee.overrides, company.weeklyPoolMicros);
   const personalSpend = personalSpendToday(usage, employee.id, now);
   if (personalSpend < limits.dailyAllowanceMicros) {
     return { kind: "allow", bucket: "personal" };

@@ -18,7 +18,7 @@ export function makeTier(fields: Partial<Tier> = {}): Tier {
   return {
     id: "engineer",
     name: "Engineer",
-    dailyAllowanceMicros: usd(0.5),
+    dailyAllowance: { kind: "fixed", micros: usd(0.5) },
     overflow: { kind: "pool", weeklyCapMicros: usd(2) },
     ...fields,
   };

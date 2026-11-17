@@ -11,17 +11,22 @@ it("loads seed/company.json with the demo company, tiers and keys", () => {
   const contents = parseSeed(JSON.parse(readFileSync("seed/company.json", "utf8")));
   expect(contents.company).toMatchObject({ id: "acme", weeklyPoolMicros: 1_000_000 });
   expect(contents.tiers).toEqual([
-    { id: "intern", name: "Intern", dailyAllowanceMicros: 10_000, overflow: { kind: "block" } },
+    {
+      id: "intern",
+      name: "Intern",
+      dailyAllowance: { kind: "fixed", micros: 10_000 },
+      overflow: { kind: "block" },
+    },
     {
       id: "engineer",
       name: "Engineer",
-      dailyAllowanceMicros: 10_000,
+      dailyAllowance: { kind: "fixed", micros: 10_000 },
       overflow: { kind: "pool", weeklyCapMicros: 20_000 },
     },
     {
       id: "staff",
       name: "Staff",
-      dailyAllowanceMicros: 50_000,
+      dailyAllowance: { kind: "fixed", micros: 50_000 },
       overflow: { kind: "pool", weeklyCapMicros: null },
     },
   ]);

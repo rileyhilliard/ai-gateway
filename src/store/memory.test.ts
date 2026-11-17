@@ -44,7 +44,7 @@ describe("createMemoryStore", () => {
     const [tier] = await store.listTiers();
     const [employee] = await store.listEmployees();
     if (!tier || !employee) throw new Error("seeded store is empty");
-    tier.dailyAllowanceMicros = 0;
+    tier.dailyAllowance = { kind: "fixed", micros: 0 };
     employee.overrides.dailyAllowanceMicros = 0;
     expect(await store.listTiers()).toEqual([makeTier()]);
     expect(await store.listEmployees()).toEqual([makeEmployee()]);

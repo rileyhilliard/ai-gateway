@@ -30,19 +30,19 @@ export function demoContents(): StoreContents {
       makeTier({
         id: "intern",
         name: "Intern",
-        dailyAllowanceMicros: usd(0.01),
+        dailyAllowance: { kind: "fixed", micros: usd(0.01) },
         overflow: { kind: "block" },
       }),
       makeTier({
         id: "engineer",
         name: "Engineer",
-        dailyAllowanceMicros: usd(0.01),
+        dailyAllowance: { kind: "fixed", micros: usd(0.01) },
         overflow: { kind: "pool", weeklyCapMicros: usd(0.02) },
       }),
       makeTier({
         id: "staff",
         name: "Staff",
-        dailyAllowanceMicros: usd(0.05),
+        dailyAllowance: { kind: "fixed", micros: usd(0.05) },
         overflow: { kind: "pool", weeklyCapMicros: null },
       }),
     ],

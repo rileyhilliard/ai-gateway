@@ -109,7 +109,7 @@ function toStoreContents(seed: SeedShape): StoreContents {
     tiers: seed.tiers.map((tier) => ({
       id: tier.id,
       name: tier.name,
-      dailyAllowanceMicros: usdToMicros(tier.dailyAllowanceUsd),
+      dailyAllowance: { kind: "fixed", micros: usdToMicros(tier.dailyAllowanceUsd) },
       overflow:
         tier.overflow.kind === "block"
           ? { kind: "block" }

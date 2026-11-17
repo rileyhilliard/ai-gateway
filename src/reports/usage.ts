@@ -69,7 +69,7 @@ export type UsageReportInput = {
  * @throws {Error} When an employee's tier isn't in `tiers`, which is a seed or programming error.
  */
 export function usageReport(input: UsageReportInput): UsageReport {
-  const { company, tiers, employees, usage, now } = input;
+  const { company, employees, usage, now } = input;
   return {
     asOf: now,
     dayResetsAt: nextDayStart(now),
@@ -80,7 +80,7 @@ export function usageReport(input: UsageReportInput): UsageReport {
       spentThisWeekMicros: companySpendThisWeek(usage, company.id, now),
       weeklyPoolMicros: company.weeklyPoolMicros,
     },
-    employees: employees.map((employee) => employeeUsage(employee, tiers, usage, now)),
+    employees: employees.map((employee) => employeeUsage(employee, input)),
   };
 }
 
@@ -89,13 +89,10 @@ export function usageReport(input: UsageReportInput): UsageReport {
  *
  * @throws {Error} When the employee's tier isn't in `tiers`.
  */
-function employeeUsage(
-  employee: Employee,
-  tiers: readonly Tier[],
-  usage: readonly UsageRecord[],
-  now: Date,
-): EmployeeUsage {
-  const limits = effectiveLimits(tierOf(employee, tiers), employee.overrides);
+function employeeUsage(employee: Employee, input: UsageReportInput): EmployeeUsage {
+  const { company, tiers, usage, now } = input;
+  const tier = tierOf(employee, tiers);
+  const limits = effectiveLimits(tier, employee.overrides, company.weeklyPoolMicros);
   return {
     employeeId: employee.id,
     name: employee.name,

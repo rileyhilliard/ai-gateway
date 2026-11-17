@@ -19,11 +19,20 @@ export type Company = { id: string; name: string; weeklyPoolMicros: Micros };
  */
 export type OverflowPolicy = { kind: "block" } | { kind: "pool"; weeklyCapMicros: Micros | null };
 
+/**
+ * A tier's daily allowance: a fixed amount, or a share of the company's weekly pool that is
+ * resolved at each decision so it follows pool changes. The share is in basis points so it
+ * stays an integer: 250 is 2.5%.
+ */
+export type DailyAllowance =
+  | { kind: "fixed"; micros: Micros }
+  | { kind: "percentOfPool"; basisPoints: number };
+
 /** A spend group. Every employee belongs to exactly one. */
 export type Tier = {
   id: string;
   name: string;
-  dailyAllowanceMicros: Micros;
+  dailyAllowance: DailyAllowance;
   overflow: OverflowPolicy;
 };
 

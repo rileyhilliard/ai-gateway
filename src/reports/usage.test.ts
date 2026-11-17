@@ -22,7 +22,7 @@ const YESTERDAY = new Date("2026-11-17T12:00:00.000Z");
 const engineer = makeTier();
 const intern = makeTier({
   id: "intern",
-  dailyAllowanceMicros: usd(0.1),
+  dailyAllowance: { kind: "fixed", micros: usd(0.1) },
   overflow: { kind: "block" },
 });
 const ada = makeEmployee();

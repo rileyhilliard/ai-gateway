@@ -280,6 +280,56 @@ describe("upstream failures", () => {
   });
 });
 
+describe("project tag", () => {
+  it("records the x-project header on the usage record", async () => {
+    const { app, gateway } = testApp();
+    await post(app, "key-staff", { "x-project": " apollo " });
+    expect(await recordsOf(gateway)).toMatchObject([{ projectTag: "apollo" }]);
+  });
+
+  it("records a blocked request's project too", async () => {
+    const { app, gateway } = testApp();
+    await post(app, "key-intern", costly);
+    await post(app, "key-intern", { ...costly, "x-project": "apollo" });
+    expect((await recordsOf(gateway))[1]).toMatchObject({
+      status: "blocked",
+      projectTag: "apollo",
+    });
+  });
+
+  it("records no project when the header is missing or blank", async () => {
+    const { app, gateway } = testApp();
+    await post(app, "key-staff");
+    await post(app, "key-staff", { "x-project": "   " });
+    const tags = (await recordsOf(gateway)).map((record) => record.projectTag);
+    expect(tags).toEqual([null, null]);
+  });
+
+  it("rejects a tag over 64 characters with a 400 naming the header, and records nothing", async () => {
+    const { app, gateway } = testApp();
+    const res = await post(app, "key-staff", { "x-project": "p".repeat(65) });
+    expect(res.status).toBe(400);
+    expect(await errorOf(res)).toMatchObject({
+      code: "bad_request",
+      issues: [
+        {
+          path: "header.x-project",
+          message: "Project tag is 65 characters; the limit is 64. Use a shorter name.",
+        },
+      ],
+    });
+    expect(await recordsOf(gateway)).toEqual([]);
+  });
+
+  it("doesn't forward x-project to the provider", async () => {
+    const { upstream, sent } = recordingUpstream();
+    const { app } = testApp({ gateway: testGateway({ openrouter: upstream }) });
+    const body = { ...message, model: "deepseek/deepseek-v4.1-flash-1017" };
+    await post(app, "key-staff", { "x-project": "apollo" }, body);
+    expect(sent[0]?.headers).not.toHaveProperty("x-project");
+  });
+});
+
 describe("misconfiguration", () => {
   it("answers 500 when an employee's tier doesn't exist", async () => {
     const contents = demoContents();

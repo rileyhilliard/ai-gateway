@@ -51,11 +51,11 @@ describe("parseSeed", () => {
     const contents = parseSeed(validSeed());
     expect(contents.company).toEqual({ id: "acme", name: "Acme", weeklyPoolMicros: 1_000_000 });
     // 0.1 is not exact in binary floating point; it must still become 100,000, not 99,999.
-    expect(contents.tiers[0]?.dailyAllowanceMicros).toBe(100_000);
+    expect(contents.tiers[0]?.dailyAllowance).toEqual({ kind: "fixed", micros: 100_000 });
     expect(contents.tiers[1]).toEqual({
       id: "engineer",
       name: "Engineer",
-      dailyAllowanceMicros: 10_000,
+      dailyAllowance: { kind: "fixed", micros: 10_000 },
       overflow: { kind: "pool", weeklyCapMicros: 20_000 },
     });
     expect(contents.tiers[2]?.overflow).toEqual({ kind: "pool", weeklyCapMicros: null });

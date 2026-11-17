@@ -105,7 +105,7 @@ describe("pool policy (rules 5 and 6)", () => {
   });
 
   it("resets at next Monday when the allowance is $0, since nothing refills tomorrow", () => {
-    const poolOnly = makeTier({ dailyAllowanceMicros: 0 });
+    const poolOnly = makeTier({ dailyAllowance: { kind: "fixed", micros: 0 } });
     expect(decideFor({ tier: poolOnly, usage: [pool(2)] })).toMatchObject({
       kind: "block",
       reason: "pool_cap_reached",
@@ -114,7 +114,7 @@ describe("pool policy (rules 5 and 6)", () => {
   });
 
   it("sends the first request of a $0-allowance tier straight to the pool", () => {
-    const poolOnly = makeTier({ dailyAllowanceMicros: 0 });
+    const poolOnly = makeTier({ dailyAllowance: { kind: "fixed", micros: 0 } });
     expect(decideFor({ tier: poolOnly })).toEqual({ kind: "allow", bucket: "pool" });
   });
 
@@ -171,15 +171,41 @@ describe("company pool (rule 3)", () => {
   });
 });
 
+describe("percent-of-pool allowances", () => {
+  // 10% of the weekly pool per day.
+  const tenPercent = makeTier({
+    dailyAllowance: { kind: "percentOfPool", basisPoints: 1_000 },
+    overflow: { kind: "block" },
+  });
+
+  it("blocks at the pool share, reporting it as the limit", () => {
+    const company = makeCompany({ weeklyPoolMicros: usd(1) });
+    expect(decideFor({ tier: tenPercent, company, usage: [personal(0.1)] })).toMatchObject({
+      kind: "block",
+      reason: "personal_allowance_exhausted",
+      spentMicros: usd(0.1),
+      limitMicros: usd(0.1),
+    });
+  });
+
+  it("follows a pool change at the next decision, with no other edit", () => {
+    const raised = makeCompany({ weeklyPoolMicros: usd(2) });
+    expect(decideFor({ tier: tenPercent, company: raised, usage: [personal(0.1)] })).toEqual({
+      kind: "allow",
+      bucket: "personal",
+    });
+  });
+});
+
 describe("admin changes mid-period", () => {
   it("spills or blocks per policy once the allowance is lowered below today's spend", () => {
-    const lowered = makeTier({ dailyAllowanceMicros: usd(0.2) });
+    const lowered = makeTier({ dailyAllowance: { kind: "fixed", micros: usd(0.2) } });
     expect(decideFor({ tier: lowered, usage: [personal(0.3)] })).toEqual({
       kind: "allow",
       bucket: "pool",
     });
     const loweredBlocking = makeTier({
-      dailyAllowanceMicros: usd(0.2),
+      dailyAllowance: { kind: "fixed", micros: usd(0.2) },
       overflow: { kind: "block" },
     });
     expect(decideFor({ tier: loweredBlocking, usage: [personal(0.3)] })).toMatchObject({
