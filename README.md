@@ -2,6 +2,8 @@
 
 A spend gateway for companies that give employees access to AI models. Each employee calls an Anthropic Messages endpoint with a personal key, and the gateway checks that request against their budget: it allows it from their daily allowance, lets it spill over into a shared weekly company pool, or blocks it with a 429 that says which limit was hit and when it resets. Allowed requests go on to OpenRouter, and their cost is recorded so an executive dashboard can show where the money goes.
 
+![Requests sent from http/gateway.http showing up on the executive dashboard within seconds](docs/media/demo.gif)
+
 This guide takes you from a fresh clone to sending requests and watching the dashboard update, in about five minutes.
 
 ## What you need
