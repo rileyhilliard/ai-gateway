@@ -7,10 +7,18 @@
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { join } from "node:path";
+import { apiPortFrom, isPortFree, portTakenMessage } from "./dev-port.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 
 type Service = { name: string; child: ChildProcess };
+
+// Bun loads the root .env into process.env before this runs, so PORT_API there counts.
+const apiPort = apiPortFrom(process.env);
+if (!(await isPortFree(apiPort))) {
+  console.error(portTakenMessage(apiPort));
+  process.exit(1);
+}
 
 const services: Service[] = [
   start("api", ["run", "dev:api"], ROOT),
