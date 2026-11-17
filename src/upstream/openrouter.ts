@@ -4,6 +4,7 @@
  * handed back unread; the gateway reads its usage as the events pass through.
  */
 
+import { providerCostToMicros } from "../budget/money.ts";
 import type { Micros, TokenUsage } from "../budget/types.ts";
 import { UpstreamUnavailableError } from "../errors.ts";
 import type { Upstream, UpstreamRequest, UpstreamResponse, UpstreamStream } from "./types.ts";
@@ -11,7 +12,6 @@ import type { Upstream, UpstreamRequest, UpstreamResponse, UpstreamStream } from
 const DEFAULT_BASE_URL = "https://openrouter.ai/api";
 // Long, non-streaming generations can take minutes; this only stops a provider that stalls.
 const DEFAULT_TIMEOUT_MS = 5 * 60_000;
-const MICROS_PER_DOLLAR = 1_000_000;
 const FORWARDED_HEADERS = ["anthropic-version", "anthropic-beta"];
 
 /** How to reach OpenRouter. `fetch` is passed in so tests never touch the network. */
@@ -67,7 +67,7 @@ function readTokenUsage(usage: Record<string, unknown> | null): TokenUsage | nul
 /** OpenRouter's reported cost in whole micro-dollars, rounded up, or null when absent. */
 function readCostMicros(usage: Record<string, unknown> | null): Micros | null {
   if (usage === null || typeof usage.cost !== "number") return null;
-  return Math.ceil(usage.cost * MICROS_PER_DOLLAR);
+  return providerCostToMicros(usage.cost);
 }
 
 /**

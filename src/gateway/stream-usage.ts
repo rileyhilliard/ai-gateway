@@ -4,6 +4,7 @@
  * provider's `message_start` and `message_delta` events said by the time the stream ended.
  */
 
+import { providerCostToMicros } from "../budget/money.ts";
 import type { Micros, TokenUsage } from "../budget/types.ts";
 
 /** Usage a provider reported: token counts, and its own cost in micros when it sent one. */
@@ -32,8 +33,6 @@ export type WatchedStream = {
 
 const LINE_BREAK = /\r\n|\r|\n/;
 const DATA_FIELD = "data:";
-// OpenRouter's usage.cost is in dollars; rounding up, like the JSON path, never undercharges.
-const MICROS_PER_DOLLAR = 1_000_000;
 // Anthropic's own mid-stream error event, so SDK clients raise a readable error rather than
 // seeing a connection reset.
 const STREAM_DROPPED_EVENT = `event: error\ndata: ${JSON.stringify({
@@ -141,7 +140,7 @@ function createUsageTally() {
       // Input is fixed once known, output is cumulative, so the latest value of each wins.
       if (typeof usage.input_tokens === "number") inputTokens = usage.input_tokens;
       if (typeof usage.output_tokens === "number") outputTokens = usage.output_tokens;
-      if (typeof usage.cost === "number") costMicros = Math.ceil(usage.cost * MICROS_PER_DOLLAR);
+      if (typeof usage.cost === "number") costMicros = providerCostToMicros(usage.cost);
     },
     current(): ReportedUsage | null {
       return hasUsage ? { usage: { inputTokens, outputTokens }, costMicros } : null;

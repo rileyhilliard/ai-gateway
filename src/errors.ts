@@ -5,6 +5,7 @@
 
 import { z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
+import { formatUsd } from "./budget/money.ts";
 import type { BlockDecision, BlockReason, Micros } from "./budget/types.ts";
 
 /**
@@ -130,9 +131,9 @@ const LIMIT_NAMES: Record<BlockReason, string> = {
 export class BudgetExceededError extends AppError {
   constructor(decision: BlockDecision) {
     const resetsAt = decision.resetsAt.toISOString();
-    const limitUsd = (decision.limitMicros / 1_000_000).toFixed(2);
+    const limit = formatUsd(decision.limitMicros);
     super("budget_exceeded", {
-      message: `${LIMIT_NAMES[decision.reason]} of $${limitUsd} used. Resets ${resetsAt}.`,
+      message: `${LIMIT_NAMES[decision.reason]} of ${limit} used. Resets ${resetsAt}.`,
       budget: {
         reason: decision.reason,
         spentMicros: decision.spentMicros,

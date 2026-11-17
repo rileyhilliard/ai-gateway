@@ -1,7 +1,7 @@
 /**
- * Converting admin-entered dollars to the integer micro-dollars the app stores. The seed file
- * and the admin API both take dollars, so they share this one conversion. Provider-reported
- * costs round up instead (src/upstream/openrouter.ts), so they never undercharge.
+ * Every conversion between dollars and the integer micro-dollars the app stores. Admin-entered
+ * dollars (seed file, admin API) round to the nearest micro-dollar; a provider's reported cost
+ * rounds up, so the gateway never undercharges. Dollars as text appear only in error messages.
  */
 
 import type { Micros } from "./types.ts";
@@ -14,7 +14,17 @@ const MICROS_PER_DOLLAR = 1_000_000;
  */
 export const MAX_USD = 1_000_000;
 
-/** Converts dollars to micro-dollars, rounding to the nearest micro-dollar. */
+/** Converts admin-entered dollars to micro-dollars, rounding to the nearest micro-dollar. */
 export function usdToMicros(usd: number): Micros {
   return Math.round(usd * MICROS_PER_DOLLAR);
+}
+
+/** Converts a provider's reported cost in dollars (OpenRouter's `usage.cost`), rounding up. */
+export function providerCostToMicros(usd: number): Micros {
+  return Math.ceil(usd * MICROS_PER_DOLLAR);
+}
+
+/** Micro-dollars as dollars with two decimals, for messages: 10_000 is "$0.01". */
+export function formatUsd(micros: Micros): string {
+  return `$${(micros / MICROS_PER_DOLLAR).toFixed(2)}`;
 }
