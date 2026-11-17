@@ -12,7 +12,7 @@ Run these from `web/`. At the repo root, `bun run dev` starts the gateway and th
 
 | Command | What it does |
 | --- | --- |
-| `bun run dev` | Run the Vite development server, proxying `/api/*` to the gateway |
+| `bun run dev` | Run the Vite development server, proxying `GET /api/admin/usage` to the gateway |
 | `bun run build` | Build the static site into dist/ |
 | `bun run preview` | Serve dist/ locally, with index.html for unknown paths |
 | `bun run typecheck` | Run tsc over the app, tests and configs |
@@ -39,7 +39,7 @@ tests/                 MSW server, usage fixtures (shared with Playwright), rend
 e2e/                   Playwright against the built bundle
 ```
 
-Data flows: `DashboardPage` reads `usageQuery` every 2 s, the API client decodes the report with zod, and each panel renders the decoded report. In dev, Vite proxies `/api/*` to the gateway and adds `x-admin-key` (`vite.config.ts`).
+Data flows: `DashboardPage` reads `usageQuery` every 2 s, the API client decodes the report with zod, and each panel renders the decoded report. In dev, Vite proxies only `GET /api/admin/usage` to the gateway and adds `x-admin-key` (`vite.config.ts`); other `/api` requests get a 404 there.
 
 ## Agent harness
 

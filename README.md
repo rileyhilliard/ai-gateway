@@ -47,7 +47,7 @@ This starts two processes and opens the dashboard in your browser:
 - the gateway on `http://localhost:3000`, with its logs in the terminal
 - the dashboard on `http://localhost:5173` (Vite picks the next free port if 5173 is taken)
 
-The dashboard talks to the gateway through Vite's dev proxy: requests to `/api/*` go to the gateway with the `x-admin-key` header added from your `.env`. The admin key stays in the dev server and never reaches the browser.
+The dashboard talks to the gateway through Vite's dev proxy, which forwards exactly one request: `GET /api/admin/usage` goes to the gateway's `GET /admin/usage` with the `x-admin-key` header added from your `.env`. The admin key stays in the dev server and never reaches the browser. Every other `/api` request gets a 404 from Vite and never reaches the gateway, because any website you visit can send requests to localhost and the proxy would add the key to them. To change budgets or keys, call the gateway directly with `http/admin.http`.
 
 Ctrl-C stops both. If either one crashes, the other is stopped too. Set `BROWSER=none` in your shell (`BROWSER=none bun dev`) to skip opening a browser tab, and run `bun run dev:api` to start the gateway on its own.
 
