@@ -1,0 +1,119 @@
+# Spend gateway: phase 2 admin requests for the VS Code REST Client extension.
+# Set ADMIN_KEY=dev-admin-key in .env, start the server with `bun run dev`, send some requests
+# from http/gateway.http, then send these. Money is in micro-dollars: 10000 is $0.01.
+# The same view as a page: open http://localhost:3000/admin and enter the admin key.
+
+@baseUrl = http://localhost:3000
+@adminKey = dev-admin-key
+
+### Usage view. Expect 200: company spend against the $1 pool, then one row per employee with
+### today's personal spend, this week's pool draws and blocked count.
+# @name usage
+GET {{baseUrl}}/admin/usage
+x-admin-key: {{adminKey}}
+
+### No admin key. Expect 401 unauthorized.
+# @name usageNoKey
+GET {{baseUrl}}/admin/usage
+
+### An employee's gateway key isn't an admin key. Expect 401 unauthorized.
+# @name usageEmployeeKey
+GET {{baseUrl}}/admin/usage
+x-admin-key: key-staff
+
+### The admin page. Expect 200 HTML with no data in it; the page fetches /admin/usage itself.
+# @name adminPage
+GET {{baseUrl}}/admin
+
+# ---------------------------------------------------------------------------------------------
+# Phase 3: admin controls. Each change applies from the next gateway request. Inputs are dollars.
+# The clock request needs DEMO_CLOCK=1 in .env. Restart the server to undo every change.
+
+@engineerKey = key-engineer
+@internKey = key-intern
+
+### Lower the weekly pool to a cent. Expect 200 with weeklyPoolMicros 10000. After any spend
+### this week, the next gateway request gets 429 company_pool_exhausted.
+# @name lowerPool
+PUT {{baseUrl}}/admin/company/pool
+x-admin-key: {{adminKey}}
+content-type: application/json
+
+{ "weeklyPoolUsd": 0.01 }
+
+### Put the pool back to $1. Expect 200 with weeklyPoolMicros 1000000.
+# @name restorePool
+PUT {{baseUrl}}/admin/company/pool
+x-admin-key: {{adminKey}}
+content-type: application/json
+
+{ "weeklyPoolUsd": 1 }
+
+### A negative pool. Expect 400 bad_request with an issue at json.weeklyPoolUsd.
+# @name negativePool
+PUT {{baseUrl}}/admin/company/pool
+x-admin-key: {{adminKey}}
+content-type: application/json
+
+{ "weeklyPoolUsd": -1 }
+
+### Move Ivy (intern, blocks after her allowance) to the engineer tier. Expect 200; her next
+### request spills to the pool instead of getting 429, and today's spend still counts.
+# @name moveIvy
+PUT {{baseUrl}}/admin/employees/ivy/tier
+x-admin-key: {{adminKey}}
+content-type: application/json
+
+{ "tierId": "engineer" }
+
+### Give Eli an uncapped pool and a $1 allowance without changing his tier. Expect 200 with
+### overrides { dailyAllowanceMicros: 1000000, poolCapMicros: null }.
+# @name overrideEli
+PUT {{baseUrl}}/admin/employees/eli/overrides
+x-admin-key: {{adminKey}}
+content-type: application/json
+
+{ "dailyAllowanceUsd": 1, "poolCapUsd": null }
+
+### Clear Eli's overrides. Expect 200 with overrides {}.
+# @name clearEli
+PUT {{baseUrl}}/admin/employees/eli/overrides
+x-admin-key: {{adminKey}}
+content-type: application/json
+
+{}
+
+### Revoke Eli's key. Expect 200 with disabled true; key-engineer now gets 401.
+# @name revokeEli
+DELETE {{baseUrl}}/admin/employees/eli/key
+x-admin-key: {{adminKey}}
+
+### The revoked key. Expect 401 unauthorized.
+# @name revokedKey
+POST {{baseUrl}}/v1/messages
+x-api-key: {{engineerKey}}
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Reissue Eli's key. Expect 200 with a new apiKey; Eli is enabled again.
+# @name reissueEli
+POST {{baseUrl}}/admin/employees/eli/key
+x-admin-key: {{adminKey}}
+
+### The new key from the reissue above. Expect 200.
+# @name newKey
+POST {{baseUrl}}/v1/messages
+x-api-key: {{reissueEli.response.body.apiKey}}
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
+### Advance the demo clock to past the next 00:00 UTC (needs DEMO_CLOCK=1). Expect 200 with the
+### new time. Allowances refill; pool draws carry over until Monday.
+# @name advanceClock
+POST {{baseUrl}}/admin/clock/advance
+x-admin-key: {{adminKey}}
+content-type: application/json
+
+{ "hours": 24 }

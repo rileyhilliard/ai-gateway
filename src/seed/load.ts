@@ -4,11 +4,10 @@
  */
 
 import { z } from "@hono/zod-openapi";
+import { usdToMicros } from "../budget/money.ts";
 import type { Micros, Overrides } from "../budget/types.ts";
 import type { Issue } from "../errors.ts";
 import type { StoreContents } from "../store/memory.ts";
-
-const MICROS_PER_DOLLAR = 1_000_000;
 
 const dollars = z.number().min(0);
 
@@ -105,12 +104,12 @@ function toStoreContents(seed: SeedShape): StoreContents {
     company: {
       id: seed.company.id,
       name: seed.company.name,
-      weeklyPoolMicros: toMicros(seed.company.weeklyPoolUsd),
+      weeklyPoolMicros: usdToMicros(seed.company.weeklyPoolUsd),
     },
     tiers: seed.tiers.map((tier) => ({
       id: tier.id,
       name: tier.name,
-      dailyAllowanceMicros: toMicros(tier.dailyAllowanceUsd),
+      dailyAllowanceMicros: usdToMicros(tier.dailyAllowanceUsd),
       overflow:
         tier.overflow.kind === "block"
           ? { kind: "block" }
@@ -132,7 +131,7 @@ function toStoreContents(seed: SeedShape): StoreContents {
 function toOverrides(overrides: SeedShape["employees"][number]["overrides"]): Overrides {
   const converted: Overrides = {};
   if (overrides.dailyAllowanceUsd !== undefined) {
-    converted.dailyAllowanceMicros = toMicros(overrides.dailyAllowanceUsd);
+    converted.dailyAllowanceMicros = usdToMicros(overrides.dailyAllowanceUsd);
   }
   if (overrides.poolCapUsd !== undefined) {
     converted.poolCapMicros = toNullableMicros(overrides.poolCapUsd);
@@ -140,10 +139,6 @@ function toOverrides(overrides: SeedShape["employees"][number]["overrides"]): Ov
   return converted;
 }
 
-function toMicros(usd: number): Micros {
-  return Math.round(usd * MICROS_PER_DOLLAR);
-}
-
 function toNullableMicros(usd: number | null): Micros | null {
-  return usd === null ? null : toMicros(usd);
+  return usd === null ? null : usdToMicros(usd);
 }

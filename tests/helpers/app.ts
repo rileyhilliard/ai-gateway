@@ -6,6 +6,7 @@
 import { createApp } from "../../src/app.ts";
 import { DEFAULT_PRICES } from "../../src/budget/pricing.ts";
 import type { Clock } from "../../src/budget/types.ts";
+import { createDemoClock } from "../../src/clock/demo-clock.ts";
 import type { GatewayDeps } from "../../src/gateway/service.ts";
 import { createLogger } from "../../src/logging.ts";
 import { createMemoryStore, type StoreContents } from "../../src/store/memory.ts";
@@ -81,19 +82,38 @@ export function testGateway(
   };
 }
 
-/** A fresh app with its own store and a logger whose records the test can read. */
-export function testApp(options: { gateway?: GatewayDeps; maxBodyBytes?: number } = {}) {
+export const ADMIN_KEY = "admin-test";
+
+/**
+ * A fresh app with its own store and a logger whose records the test can read. The admin key is
+ * ADMIN_KEY unless `adminKey` is passed; `adminKey: null` runs the app with no key configured.
+ */
+export function testApp(
+  options: {
+    gateway?: GatewayDeps;
+    maxBodyBytes?: number;
+    adminKey?: string | null;
+    /** Starts a demo clock at NOW and mounts its route; the gateway reads that clock. */
+    demoClock?: boolean;
+  } = {},
+) {
+  const demoClock = options.demoClock ? createDemoClock(() => NOW) : undefined;
+  const adminKey = options.adminKey === null ? undefined : (options.adminKey ?? ADMIN_KEY);
   const records: LogRecord[] = [];
   const logger = createLogger("debug", {
     write: (line: string) => {
       records.push(JSON.parse(line) as LogRecord);
     },
   });
-  const gateway = options.gateway ?? testGateway();
+  const gateway = options.gateway ?? testGateway(demoClock ? { clock: demoClock.now } : {});
   const app = createApp({
-    config: { maxBodyBytes: options.maxBodyBytes ?? 65_536 },
+    config: {
+      maxBodyBytes: options.maxBodyBytes ?? 65_536,
+      adminKey,
+    },
     logger,
     gateway,
+    demoClock,
   });
   const requests = () => records.filter((record) => record.msg === "request");
   return { app, records, requests, gateway };

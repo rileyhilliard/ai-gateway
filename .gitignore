@@ -2,7 +2,8 @@
 dist/
 
 # Dependencies
-node_modules/
+# No trailing slash, so the node_modules symlink in agent worktrees is ignored too.
+node_modules
 
 # Test output
 coverage/

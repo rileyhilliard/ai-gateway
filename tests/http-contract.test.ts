@@ -42,7 +42,16 @@ describe("health and the OpenAPI document", () => {
       paths: Record<string, Record<string, unknown>>;
       components: { schemas: Record<string, unknown> };
     };
-    expect(Object.keys(doc.paths).sort()).toEqual(["/healthz", "/v1/messages"]);
+    expect(Object.keys(doc.paths).sort()).toEqual([
+      "/admin",
+      "/admin/company/pool",
+      "/admin/employees/{id}/key",
+      "/admin/employees/{id}/overrides",
+      "/admin/employees/{id}/tier",
+      "/admin/usage",
+      "/healthz",
+      "/v1/messages",
+    ]);
     expect(Object.keys(doc.paths["/v1/messages"] ?? {})).toEqual(["post"]);
     expect(doc.components.schemas).toHaveProperty("Error");
   });
@@ -104,6 +113,11 @@ describe("errors", () => {
     const failing: Store = {
       getCompany: unused,
       getTier: unused,
+      listTiers: unused,
+      listEmployees: unused,
+      setWeeklyPool: unused,
+      getEmployee: unused,
+      updateEmployee: unused,
       findEmployeeByKey: () => Promise.reject(new TypeError("db password=hunter2")),
       listUsageSince: unused,
       addUsage: unused,

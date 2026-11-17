@@ -5,7 +5,12 @@
 
 import { describe, expect, it } from "vitest";
 import { makeRecord, NOW, usd } from "../../tests/helpers/fixtures.ts";
-import { companySpendThisWeek, personalSpendToday, poolDrawsThisWeek } from "./spend.ts";
+import {
+  blockedRequestsThisWeek,
+  companySpendThisWeek,
+  personalSpendToday,
+  poolDrawsThisWeek,
+} from "./spend.ts";
 
 const MONDAY = new Date("2026-11-16T00:00:00.000Z");
 const TODAY = new Date("2026-11-18T00:00:00.000Z");
@@ -79,5 +84,20 @@ describe("records from a later period", () => {
     expect(personalSpendToday(records, "ada", NOW)).toBe(0);
     expect(poolDrawsThisWeek(records, "ada", NOW)).toBe(0);
     expect(companySpendThisWeek(records, "acme", NOW)).toBe(usd(1));
+  });
+});
+
+describe("blockedRequestsThisWeek", () => {
+  it("counts this employee's blocked requests since Monday, not allowed ones or last week's", () => {
+    const blocked = (fields = {}) =>
+      makeRecord({ status: "blocked", bucket: null, blockReason: "pool_cap_reached", ...fields });
+    const records = [
+      blocked(),
+      blocked({ startedAt: MONDAY }),
+      blocked({ startedAt: LAST_SUNDAY }),
+      blocked({ employeeId: "grace" }),
+      makeRecord(),
+    ];
+    expect(blockedRequestsThisWeek(records, "ada", NOW)).toBe(2);
   });
 });

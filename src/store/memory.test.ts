@@ -29,6 +29,27 @@ function seededStore() {
 }
 
 describe("createMemoryStore", () => {
+  it("lists tiers and employees in seed order, disabled employees included", async () => {
+    const store = createMemoryStore({
+      company: makeCompany(),
+      tiers: [makeTier({ id: "b" }), makeTier({ id: "a" })],
+      employees: [makeEmployee({ id: "zed", disabled: true }), makeEmployee({ id: "amy" })],
+    });
+    expect((await store.listTiers()).map((tier) => tier.id)).toEqual(["b", "a"]);
+    expect((await store.listEmployees()).map((employee) => employee.id)).toEqual(["zed", "amy"]);
+  });
+
+  it("returns lists the caller can't use to change stored state", async () => {
+    const store = seededStore();
+    const [tier] = await store.listTiers();
+    const [employee] = await store.listEmployees();
+    if (!tier || !employee) throw new Error("seeded store is empty");
+    tier.dailyAllowanceMicros = 0;
+    employee.overrides.dailyAllowanceMicros = 0;
+    expect(await store.listTiers()).toEqual([makeTier()]);
+    expect(await store.listEmployees()).toEqual([makeEmployee()]);
+  });
+
   it("returns the company", async () => {
     expect(await seededStore().getCompany()).toEqual(makeCompany());
   });
@@ -71,5 +92,48 @@ describe("createMemoryStore", () => {
     record.startedAt.setUTCFullYear(2000);
     const [again] = await store.listUsageSince("acme", MONDAY);
     expect(again).toMatchObject({ costMicros: 0, startedAt: MONDAY });
+  });
+});
+
+describe("admin changes", () => {
+  it("sets the weekly pool", async () => {
+    const store = seededStore();
+    expect(await store.setWeeklyPool(42)).toMatchObject({ weeklyPoolMicros: 42 });
+    expect((await store.getCompany()).weeklyPoolMicros).toBe(42);
+  });
+
+  it("gets an employee by id, and nothing for an unknown id", async () => {
+    const store = seededStore();
+    expect(await store.getEmployee("ada")).toEqual(makeEmployee());
+    expect(await store.getEmployee("nobody")).toBeUndefined();
+  });
+
+  it("changes only the given fields, and the new key finds the employee", async () => {
+    const store = seededStore();
+    const updated = await store.updateEmployee("ada", { apiKey: "key-new", disabled: true });
+    expect(updated).toEqual(makeEmployee({ apiKey: "key-new", disabled: true }));
+    expect(await store.findEmployeeByKey("key-ada")).toBeUndefined();
+    expect(await store.findEmployeeByKey("key-new")).toEqual(updated);
+  });
+
+  it("leaves a field alone when the change for it is undefined", async () => {
+    const store = seededStore();
+    expect(await store.updateEmployee("ada", { tierId: undefined, disabled: true })).toEqual(
+      makeEmployee({ disabled: true }),
+    );
+  });
+
+  it("returns undefined and changes nothing for an unknown employee", async () => {
+    const store = seededStore();
+    expect(await store.updateEmployee("nobody", { disabled: true })).toBeUndefined();
+    expect(await store.listEmployees()).toEqual([makeEmployee()]);
+  });
+
+  it("keeps no link to the changes object the caller passed", async () => {
+    const store = seededStore();
+    const overrides = { dailyAllowanceMicros: 5 };
+    await store.updateEmployee("ada", { overrides });
+    overrides.dailyAllowanceMicros = 99;
+    expect((await store.getEmployee("ada"))?.overrides).toEqual({ dailyAllowanceMicros: 5 });
   });
 });
