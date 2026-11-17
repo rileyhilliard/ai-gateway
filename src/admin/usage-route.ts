@@ -38,6 +38,13 @@ const EmployeeUsageSchema = z.object({
   blockedThisWeek: z.number().int(),
 });
 
+const ProjectUsageSchema = z.object({
+  projectTag: z.string().nullable(),
+  spentThisWeekMicros: micros,
+  requests: z.number().int(),
+  blockedRequests: z.number().int(),
+});
+
 const UsageReportSchema = z
   .object({
     asOf: z.iso.datetime(),
@@ -50,6 +57,7 @@ const UsageReportSchema = z
       weeklyPoolMicros: micros,
     }),
     employees: z.array(EmployeeUsageSchema),
+    projects: z.array(ProjectUsageSchema),
   })
   .openapi("UsageReport");
 
@@ -85,6 +93,12 @@ const ADMIN_PAGE = `<!doctype html>
     <th>Pool draws / cap</th><th>Blocked this week</th>
   </tr></thead>
   <tbody id="rows"></tbody>
+</table>
+<table hidden id="projectTable">
+  <thead><tr>
+    <th>Project</th><th>Spent this week</th><th>Requests</th><th>Blocked this week</th>
+  </tr></thead>
+  <tbody id="projectRows"></tbody>
 </table>
 <script>
   const keyInput = document.getElementById("key");
@@ -128,6 +142,23 @@ const ADMIN_PAGE = `<!doctype html>
       rows.append(tr);
     }
     document.getElementById("table").hidden = false;
+    renderProjects(report.projects);
+  }
+
+  function renderProjects(projects) {
+    const rows = document.getElementById("projectRows");
+    rows.replaceChildren();
+    for (const row of projects) {
+      const tr = document.createElement("tr");
+      tr.append(
+        cell(row.projectTag === null ? "(no project)" : row.projectTag),
+        cell(dollars(row.spentThisWeekMicros)),
+        cell(String(row.requests)),
+        cell(String(row.blockedRequests)),
+      );
+      rows.append(tr);
+    }
+    document.getElementById("projectTable").hidden = false;
   }
 
   async function load() {
@@ -157,7 +188,7 @@ export function adminRoutes(deps: AdminDeps) {
     middleware: [requireAdmin(deps.adminKey)] as const,
     responses: {
       200: {
-        description: "Spend per employee and for the company, as of now",
+        description: "Spend per employee, per project and for the company, as of now",
         content: { "application/json": { schema: UsageReportSchema } },
       },
       401: errorResponse("Missing or wrong admin key, or ADMIN_KEY isn't configured"),

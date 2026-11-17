@@ -12,6 +12,17 @@
 GET {{baseUrl}}/admin/usage
 x-admin-key: {{adminKey}}
 
+### Phase 7: a request tagged with a project. x-project goes on gateway requests, not admin
+### ones; it isn't forwarded upstream. Expect 200, then the usage view above lists "apollo"
+### under projects. Requests without the header count under projectTag null.
+# @name taggedRequest
+POST {{baseUrl}}/v1/messages
+x-api-key: key-staff
+x-project: apollo
+content-type: application/json
+
+{ "model": "fake/model", "max_tokens": 64, "messages": [{ "role": "user", "content": "Hello" }] }
+
 ### No admin key. Expect 401 unauthorized.
 # @name usageNoKey
 GET {{baseUrl}}/admin/usage

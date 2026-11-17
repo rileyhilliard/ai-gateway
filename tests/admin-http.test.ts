@@ -107,6 +107,39 @@ describe("GET /admin/usage", () => {
     const report = await (await getUsage(app)).json();
     expect(report.company.spentThisWeekMicros).toBe(0);
   });
+
+  it("GET /admin/usage reports spend per project from tagged gateway requests", async () => {
+    const { app } = testApp();
+    const sendFor = (apiKey: string, project?: string) =>
+      app.request(
+        "/v1/messages",
+        jsonBody(message, {
+          "x-api-key": apiKey,
+          ...costly,
+          ...(project === undefined ? {} : { "x-project": project }),
+        }),
+      );
+    // Sam's uncapped pool allows everything; Ivy's second request is blocked by her allowance.
+    await sendFor("key-staff", "apollo");
+    await sendFor("key-staff", " apollo ");
+    await sendFor("key-staff");
+    await sendFor("key-intern", "apollo");
+    await sendFor("key-intern", "apollo");
+
+    const report = await (await getUsage(app)).json();
+    expect(report.projects).toEqual([
+      { projectTag: "apollo", spentThisWeekMicros: 3 * 11_000, requests: 3, blockedRequests: 1 },
+      { projectTag: null, spentThisWeekMicros: 11_000, requests: 1, blockedRequests: 0 },
+    ]);
+  });
+
+  it("documents the projects field in the OpenAPI usage schema", async () => {
+    const { app } = testApp();
+    const doc = await (await app.request("/openapi.json")).json();
+    expect(doc.components.schemas.UsageReport.properties.projects).toMatchObject({
+      type: "array",
+    });
+  });
 });
 
 describe("GET /admin", () => {
@@ -123,5 +156,13 @@ describe("GET /admin", () => {
     // Data only arrives through the keyed JSON request, so the page itself is safe to serve.
     expect(page).not.toContain("Eli");
     expect(page).not.toContain(ADMIN_KEY);
+  });
+
+  it("has a projects table that renders the report's project rows", async () => {
+    const { app } = testApp();
+    const page = await (await app.request("/admin")).text();
+    expect(page).toContain('id="projectRows"');
+    expect(page).toContain("report.projects");
+    expect(page).toContain("(no project)");
   });
 });
