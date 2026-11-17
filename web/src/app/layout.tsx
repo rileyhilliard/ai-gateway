@@ -1,21 +1,15 @@
 /**
- * Renders the shared app shell and navigation link around the active child route. The route
- * tree uses its outlet for the items pages.
+ * Renders the shared app shell around the active child route. The dashboard draws its own
+ * header, since the company name comes from the data.
  */
 
-import { Link, Outlet } from "react-router";
+import { Outlet } from "react-router";
 
+/** The page frame every route renders inside. */
 export function Layout() {
   return (
-    <div className="shell">
-      <header className="shell-header">
-        <Link to="/" className="shell-title">
-          Items
-        </Link>
-      </header>
-      <main className="shell-main">
-        <Outlet />
-      </main>
-    </div>
+    <main className="shell-main">
+      <Outlet />
+    </main>
   );
 }

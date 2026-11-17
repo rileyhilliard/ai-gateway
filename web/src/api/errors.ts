@@ -44,13 +44,18 @@ export function isRetryable(error: unknown): boolean {
   return error.kind === "network" || (error.status !== undefined && TRANSIENT.has(error.status));
 }
 
+// Vite's dev proxy answers 502 when the gateway behind it refuses the connection.
+const GATEWAY_DOWN = new Set([502, 504]);
+
 /** The sentence the UI shows for a failure. Never the raw error message or response body. */
 export function userMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return "Something went wrong.";
-  if (error.kind === "network") return "Couldn't reach the server. Check your connection.";
-  if (error.kind === "decode") return "The server sent a response this app can't read.";
-  if (error.status === 401 || error.status === 403) return "You don't have access to this.";
-  if (error.status === 404) return "Not found.";
-  if (error.status !== undefined && error.status >= 500) return "The server had a problem.";
-  return "The request failed.";
+  if (error.kind === "network" || (error.status !== undefined && GATEWAY_DOWN.has(error.status))) {
+    return "Can't reach the gateway. Is bun dev running?";
+  }
+  if (error.kind === "decode") return "The gateway sent a report this dashboard can't read.";
+  if (error.status === 401) {
+    return "The gateway rejected the admin key. Set ADMIN_KEY (8+ characters) in the repo's .env and restart bun dev.";
+  }
+  return `The gateway answered with HTTP ${error.status}.`;
 }

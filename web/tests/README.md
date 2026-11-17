@@ -6,7 +6,7 @@ source use it to exercise pages and navigation.
 
 [setup.ts](setup.ts) installs DOM matchers, starts the MSW server in
 `msw/server.ts`, and cleans components and handlers between tests.
-The handlers use `fixtures/items.ts`, also shared with Playwright.
+The handlers use `fixtures/usage.ts`, also shared with Playwright.
 
 [boundaries.test.ts](boundaries.test.ts) probes the Biome plugin on Node.
 Vitest's app project runs source tests in happy-dom; its Node project runs
