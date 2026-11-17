@@ -156,6 +156,18 @@ describe("model check (rule 2)", () => {
     expect(sent).toHaveLength(0);
     expect(await recordsOf(gateway)).toEqual([]);
   });
+
+  it("rejects fake/ models as unknown when the fake upstream is off (FAKE_UPSTREAM=0)", async () => {
+    const { app, gateway } = testApp({ gateway: testGateway({ fakeUpstream: false }) });
+    const res = await post(app, "key-staff", costly);
+    expect(res.status).toBe(400);
+    expect(await errorOf(res)).toMatchObject({
+      code: "unknown_model",
+      message:
+        'Model "fake/model" isn\'t available through the gateway. Use one of: deepseek/deepseek-v4.1-flash-1017, anthropic/claude-sonnet-5.5.',
+    });
+    expect(await recordsOf(gateway)).toEqual([]);
+  });
 });
 
 describe("budget outcomes", () => {

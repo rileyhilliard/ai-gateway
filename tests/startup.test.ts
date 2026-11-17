@@ -37,6 +37,59 @@ function runMain(env: Record<string, string>): Promise<{ code: number | null; st
   });
 }
 
+/**
+ * Runs main.ts on a free port with `env` until it logs "listening", and returns its port and the
+ * log records printed by then.
+ */
+function startMain(env: Record<string, string>): Promise<{ port: number; logs: LogLine[] }> {
+  return new Promise((resolve, reject) => {
+    const started = spawn(process.execPath, [MAIN], {
+      env: { PATH: process.env.PATH ?? "", LOG_LEVEL: "info", PORT_API: "0", ...env },
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    child = started;
+    const logs: LogLine[] = [];
+    let buffered = "";
+    started.stdout?.setEncoding("utf8").on("data", (text: string) => {
+      buffered += text;
+      const lines = buffered.split("\n");
+      buffered = lines.pop() ?? "";
+      for (const line of lines) {
+        const record = JSON.parse(line) as LogLine;
+        logs.push(record);
+        if (record.msg === "listening") resolve({ port: Number(record.port), logs });
+      }
+    });
+    started.on("error", reject);
+    started.on("exit", (code) => reject(new Error(`main.ts exited with ${code} before listening`)));
+  });
+}
+
+type LogLine = { level: number; msg: string; port?: number };
+
+const fakeMessage = (port: number) =>
+  fetch(`http://127.0.0.1:${port}/v1/messages`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": "key-staff" },
+    body: JSON.stringify({ model: "fake/model", max_tokens: 8, messages: [] }),
+  });
+
+it("turns fake/ models off under NODE_ENV=production, so they're unknown models", async () => {
+  const { port, logs } = await startMain({ NODE_ENV: "production" });
+  const res = await fakeMessage(port);
+  expect(res.status).toBe(400);
+  expect((await res.json()).error.code).toBe("unknown_model");
+  expect(logs.map((record) => record.msg)).not.toContainEqual(expect.stringMatching(/fake\//));
+});
+
+it("serves fake/ models by default and says so at startup", async () => {
+  const { port, logs } = await startMain({});
+  expect((await fakeMessage(port)).status).toBe(200);
+  expect(logs.map((record) => record.msg)).toContainEqual(
+    expect.stringMatching(/^fake\/ models are enabled/),
+  );
+});
+
 it("exits 1 with a one-line reason when the port is already taken", async () => {
   blocker = await startServer(testApp().app, 0);
 

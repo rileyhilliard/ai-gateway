@@ -23,4 +23,8 @@ describe("selectUpstream", () => {
     );
     expect(selectUpstream("fakeish/model", { fake, openrouter })).toBe(openrouter);
   });
+
+  it("never sends a fake/ model to OpenRouter when the fake upstream is off", () => {
+    expect(() => selectUpstream("fake/model", { openrouter })).toThrow(/FAKE_UPSTREAM=0/);
+  });
 });

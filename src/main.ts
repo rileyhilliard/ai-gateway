@@ -7,7 +7,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createApp } from "./app.ts";
-import { DEFAULT_PRICES } from "./budget/pricing.ts";
+import { priceTable } from "./budget/pricing.ts";
 import { createDemoClock } from "./clock/demo-clock.ts";
 import { ConfigError, loadConfig } from "./config.ts";
 import { createLogger, describeFailure } from "./logging.ts";
@@ -47,13 +47,18 @@ const demoClock = config.demoClock ? createDemoClock(() => new Date()) : undefin
 if (demoClock) {
   logger.warn("DEMO_CLOCK is on: POST /admin/clock/advance moves budget time forward");
 }
+if (config.fakeUpstream) {
+  logger.warn(
+    "fake/ models are enabled: x-fake-* headers pick their token counts. Set FAKE_UPSTREAM=0 or NODE_ENV=production to turn them off",
+  );
+}
 const gateway = {
   store: createMemoryStore(seed),
   upstreams: {
-    fake: createFakeUpstream(),
+    ...(config.fakeUpstream ? { fake: createFakeUpstream() } : {}),
     openrouter: createOpenRouterUpstream({ apiKey: config.openRouterKey, fetch }),
   },
-  prices: DEFAULT_PRICES,
+  prices: priceTable({ fakeModels: config.fakeUpstream }),
   clock: demoClock?.now ?? (() => new Date()),
   newId: randomUUID,
 };

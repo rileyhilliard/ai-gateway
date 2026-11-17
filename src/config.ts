@@ -1,6 +1,7 @@
 /**
  * Validates environment settings: port, log level, request-body limit, the seed file, the
- * OpenRouter key, the admin key and the demo clock switch. The process entry loads these values
+ * OpenRouter key, the admin key, and the demo clock and fake upstream switches. The process entry
+ * loads these values
  * before building the app, and exits naming any bad variable.
  */
 
@@ -23,6 +24,12 @@ export type AppConfig = {
   adminKey: string | undefined;
   /** When on, POST /admin/clock/advance moves the gateway's clock forward. Never for production. */
   demoClock: boolean;
+  /**
+   * When on, `fake/` models are accepted and answered in process, with token counts the caller
+   * picks through x-fake-* headers. Never for production: anyone with a key could choose their
+   * own cost. FAKE_UPSTREAM=1 or 0 sets it; otherwise it's on unless NODE_ENV=production.
+   */
+  fakeUpstream: boolean;
 };
 
 export class ConfigError extends Error {
@@ -52,6 +59,8 @@ const Env = z.object({
   // A short or blank key would be easy to guess, so it fails at startup instead.
   ADMIN_KEY: optional(z.string().trim().min(8)),
   DEMO_CLOCK: optional(z.enum(["0", "1"])),
+  FAKE_UPSTREAM: optional(z.enum(["0", "1"])),
+  NODE_ENV: optional(z.string()),
 });
 
 /** Parses settings from an environment record. Throws ConfigError naming each bad variable. */
@@ -69,5 +78,9 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     openRouterKey: data.OPENROUTER_KEY,
     adminKey: data.ADMIN_KEY,
     demoClock: data.DEMO_CLOCK === "1",
+    fakeUpstream:
+      data.FAKE_UPSTREAM === undefined
+        ? data.NODE_ENV !== "production"
+        : data.FAKE_UPSTREAM === "1",
   };
 }

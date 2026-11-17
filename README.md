@@ -36,6 +36,8 @@ Open `.env` and set these:
 
 `PORT_API` (default 3000) moves the gateway to another port if 3000 is taken. `MAX_BODY_BYTES` (default 10485760, 10 MB) is the largest request body before a 413; Claude Code's requests need well over 64 KB.
 
+`FAKE_UPSTREAM` turns the `fake/` models on (`1`) or off (`0`). It defaults to on, which is what `bun dev` and the tests use, and to off when `NODE_ENV=production`, which `bun run start` sets. Keep it off anywhere real money is tracked: the `x-fake-*` headers let the caller choose a request's token counts, and so its cost. With it off, `fake/model` is an unknown model (400). The gateway logs a warning at startup while it's on.
+
 ## Run it
 
 ```sh
@@ -218,7 +220,8 @@ Claude Code's requests appear on the dashboard under Sam. The gateway doesn't im
 | The dashboard says "The gateway rejected the admin key" | `ADMIN_KEY` is missing from `.env` or shorter than 8 characters. Set it and restart `bun dev`. |
 | The dashboard says "Can't reach the gateway" | The gateway isn't running or crashed at startup. Its error is in the terminal. |
 | The gateway exits with "Invalid configuration" | A variable in `.env` has a bad value. The message names it. |
-| A real model returns 502 `upstream_unavailable` | `OPENROUTER_KEY` isn't set, or OpenRouter couldn't be reached. Use a `fake/` model, or set the key. |
+| A real model returns 502 `upstream_unavailable` | `OPENROUTER_KEY` isn't set, OpenRouter couldn't be reached, or OpenRouter refused the company key or account; the gateway's warning log says which. Use a `fake/` model, or fix the key. |
+| `fake/model` returns 400 `unknown_model` | The fake upstream is off: `bun run start` sets `NODE_ENV=production`. Use `bun dev`, or set `FAKE_UPSTREAM=1` for a demo. |
 
 ## Run the checks
 
