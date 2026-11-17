@@ -1,12 +1,14 @@
 /**
  * Declares POST /v1/messages, the Anthropic Messages endpoint employees call. It authenticates
  * the key before the body is validated, then hands the request to the gateway service and
- * passes the upstream's response through unchanged.
+ * passes the upstream's response through unchanged: JSON, or server-sent events for a
+ * `stream: true` request.
  */
 
 import { createRoute, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
 import type { Employee } from "../budget/types.ts";
+import type { Logger } from "../logging.ts";
 import { createRouter } from "../router.ts";
 import { anthropicErrorResponse } from "./anthropic-errors.ts";
 import { authenticate } from "./authenticate.ts";
@@ -25,8 +27,11 @@ const requireEmployee = (store: GatewayDeps["store"]) =>
     await next();
   });
 
-/** The messages router, bound to the gateway's dependencies. */
-export function messagesRoutes(deps: GatewayDeps) {
+/**
+ * The messages router, bound to the gateway's dependencies. `logger` reports a streamed
+ * request's usage that couldn't be recorded, since no error handler sees it by then.
+ */
+export function messagesRoutes(deps: GatewayDeps, logger: Logger) {
   const messages = createRoute({
     method: "post",
     path: "/v1/messages",
@@ -50,6 +55,23 @@ export function messagesRoutes(deps: GatewayDeps) {
       body: c.req.valid("json"),
       headers: c.req.header(),
     });
+    if (upstream.kind === "stream") {
+      const requestId = c.get("requestId");
+      // The response has started, so a failed charge can't change it; it is logged here, once.
+      upstream.usageRecorded.catch((error: unknown) => {
+        logger.error({ requestId, ...describeError(error) }, "usage not recorded");
+      });
+      // A raw Response skips the headers middleware set on the context, so the request id that
+      // the failure log above carries is added here for the client to quote.
+      return new Response(upstream.events, {
+        status: upstream.status,
+        headers: {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+          "x-request-id": requestId,
+        },
+      });
+    }
     // The provider's status (including its own errors such as 529) and body go back as they came.
     const isText = typeof upstream.body === "string";
     return new Response(isText ? String(upstream.body) : JSON.stringify(upstream.body), {
@@ -57,4 +79,13 @@ export function messagesRoutes(deps: GatewayDeps) {
       headers: { "content-type": isText ? "text/plain; charset=utf-8" : "application/json" },
     });
   });
+}
+
+/** The class and stack of a failure for the log; like app.onError, it leaves the message out. */
+function describeError(error: unknown): { errorClass: string; stack?: string } {
+  if (!(error instanceof Error)) return { errorClass: typeof error };
+  return {
+    errorClass: error.constructor.name,
+    stack: error.stack?.split("\n").slice(1).join("\n"),
+  };
 }

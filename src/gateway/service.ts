@@ -1,6 +1,7 @@
 /**
  * One authenticated messages request end to end: check the model has a price, decide the
- * budget, forward to the chosen upstream, and record the usage. HTTP lives in the route.
+ * budget, forward to the chosen upstream, and record the usage (for a stream, once it ends).
+ * HTTP and logging live in the route.
  */
 
 import { decide } from "../budget/decide.ts";
@@ -19,6 +20,13 @@ import type {
 import { BadRequestError, BudgetExceededError, UnknownModelError } from "../errors.ts";
 import type { Store } from "../store/types.ts";
 import { selectUpstream, type Upstreams } from "../upstream/select.ts";
+import {
+  isUpstreamStream,
+  type Upstream,
+  type UpstreamResponse,
+  type UpstreamStream,
+} from "../upstream/types.ts";
+import { type ReportedUsage, watchStreamUsage } from "./stream-usage.ts";
 
 /** What the gateway needs from the outside world. */
 export type GatewayDeps = {
@@ -36,8 +44,19 @@ export type MessageRequest = {
   headers: Record<string, string>;
 };
 
-/** The upstream's answer, passed through to the client unchanged. */
-export type MessageResponse = { status: number; body: unknown };
+/**
+ * The upstream's answer, passed through to the client unchanged. A stream is charged when it
+ * ends, after the response has started, so `usageRecorded` settles then; it rejects only when
+ * the store couldn't write the record.
+ */
+export type MessageResponse =
+  | { kind: "json"; status: number; body: unknown }
+  | {
+      kind: "stream";
+      status: number;
+      events: ReadableStream<Uint8Array>;
+      usageRecorded: Promise<void>;
+    };
 
 // The employee's key and hop-by-hop headers stop here; the upstream adds its own credentials.
 const HEADERS_NOT_FORWARDED = new Set([
@@ -87,15 +106,31 @@ export async function handleMessage(
     throw new BudgetExceededError(decision);
   }
 
-  const upstream = selectUpstream(body.model, deps.upstreams);
-  const response = await upstream.send({ body, headers: forwardableHeaders(request.headers) });
+  const response = await forward(selectUpstream(body.model, deps.upstreams), request);
 
   // No usage reported means nothing we can charge, even for a provider error.
-  if (response.usage) {
-    const cost = response.costMicros ?? costMicros(price, response.usage);
-    await store.addUsage(allowedRecord(base, decision.bucket, response.usage, cost));
+  const charge = async (reported: ReportedUsage | null) => {
+    if (!reported) return;
+    const cost = reported.costMicros ?? costMicros(price, reported.usage);
+    await store.addUsage(allowedRecord(base, decision.bucket, reported.usage, cost));
+  };
+
+  if (isUpstreamStream(response)) {
+    const { events, ended } = watchStreamUsage(response.events);
+    return { kind: "stream", status: response.status, events, usageRecorded: ended.then(charge) };
   }
-  return { status: response.status, body: response.body };
+  await charge(response.usage ? { usage: response.usage, costMicros: response.costMicros } : null);
+  return { kind: "json", status: response.status, body: response.body };
+}
+
+/** Sends the request, streaming when the client asked to and the upstream can. */
+function forward(
+  upstream: Upstream,
+  request: MessageRequest,
+): Promise<UpstreamResponse | UpstreamStream> {
+  const upstreamRequest = { body: request.body, headers: forwardableHeaders(request.headers) };
+  if (request.body.stream === true && upstream.stream) return upstream.stream(upstreamRequest);
+  return upstream.send(upstreamRequest);
 }
 
 type RecordBase = {

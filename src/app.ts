@@ -67,7 +67,7 @@ export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
   );
 
   app.route("/", healthRoutes());
-  app.route("/", messagesRoutes(gateway));
+  app.route("/", messagesRoutes(gateway, logger));
   app.route(
     "/",
     adminRoutes({ store: gateway.store, clock: gateway.clock, adminKey: config.adminKey }),
