@@ -98,6 +98,40 @@ describe("other gateway errors", () => {
   });
 });
 
+const MALFORMED_JSON_ISSUE = {
+  path: "json",
+  message: "Body isn't valid JSON. Send a JSON object with content-type: application/json.",
+};
+
+describe("malformed JSON bodies", () => {
+  it("say what's wrong in Anthropic's shape on /v1", async () => {
+    const { app } = testApp();
+    const res = await app.request("/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": "key-staff" },
+      body: "{not json",
+    });
+    expect(res.status).toBe(400);
+    const { error } = AnthropicErrorBody.parse(await res.json());
+    expect(error).toMatchObject({ type: "invalid_request_error", code: "bad_request" });
+    // Claude Code shows only the message, so it carries the fix as well as the issue does.
+    expect(error.message).toBe(MALFORMED_JSON_ISSUE.message);
+    expect(error.issues).toEqual([MALFORMED_JSON_ISSUE]);
+  });
+
+  it("say what's wrong in the app's envelope on admin routes", async () => {
+    const { app } = testApp();
+    const res = await app.request("/admin/company/pool", {
+      method: "PUT",
+      headers: { "content-type": "application/json", "x-admin-key": ADMIN_KEY },
+      body: "{not json",
+    });
+    expect(res.status).toBe(400);
+    const { error } = ErrorEnvelope.parse(await res.json());
+    expect(error).toMatchObject({ code: "bad_request", issues: [MALFORMED_JSON_ISSUE] });
+  });
+});
+
 describe("routes outside /v1", () => {
   it("keep the app's envelope for admin errors", async () => {
     const { app } = testApp();

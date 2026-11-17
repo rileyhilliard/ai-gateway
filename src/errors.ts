@@ -80,8 +80,20 @@ export class NotFoundError extends AppError {
 }
 
 export class BadRequestError extends AppError {
-  constructor(issues?: Issue[]) {
-    super("bad_request", issues ? { issues } : {});
+  /** `message` replaces "Invalid request." when one issue says it all; it must be safe to echo. */
+  constructor(issues?: Issue[], message?: string) {
+    super("bad_request", { ...(issues ? { issues } : {}), ...(message ? { message } : {}) });
+  }
+}
+
+const MALFORMED_JSON_MESSAGE =
+  "Body isn't valid JSON. Send a JSON object with content-type: application/json.";
+
+/** The body was sent as JSON but doesn't parse. */
+export class MalformedJsonError extends BadRequestError {
+  constructor(cause?: unknown) {
+    super([{ path: "json", message: MALFORMED_JSON_MESSAGE }], MALFORMED_JSON_MESSAGE);
+    this.cause = cause;
   }
 }
 
@@ -184,6 +196,9 @@ function codeForStatus(status: number): ErrorCode {
  */
 export function toAppError(error: unknown): AppError {
   if (error instanceof AppError) return error;
+  // Every body the API reads is JSON, so Hono's only 400 here is its JSON validator failing to
+  // parse the body.
+  if (error instanceof HTTPException && error.status === 400) return new MalformedJsonError(error);
   if (error instanceof HTTPException) return new AppError(codeForStatus(error.status));
   return new AppError("internal");
 }

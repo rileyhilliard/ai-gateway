@@ -91,7 +91,9 @@ describe("errors", () => {
       headers: { "content-type": "application/json", ...withKey },
       body: "{not json",
     });
-    await expectAnthropicError(res, "bad_request");
+    await expectAnthropicError(res, "bad_request", {
+      message: "Body isn't valid JSON. Send a JSON object with content-type: application/json.",
+    });
   });
 
   it("a body that isn't JSON is a 415 in Anthropic's shape", async () => {
