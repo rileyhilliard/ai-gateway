@@ -1,6 +1,6 @@
 # Phase 5: streaming, so Claude Code works through the gateway
 
-Status: lane a (opus) running from seam `727bece`.
+Status: done, tagged `phase-5`.
 Shared spec, error model and contracts: [spec.md](spec.md). Overview and phase status: [README.md](README.md).
 
 Demo: Claude Code with `ANTHROPIC_BASE_URL=http://localhost:3000`, an employee key in `ANTHROPIC_API_KEY` (sent as `x-api-key`), and `ANTHROPIC_MODEL` / `ANTHROPIC_SMALL_FAST_MODEL` set to `deepseek/deepseek-v4.1-flash-1017`, since the gateway only accepts priced OpenRouter ids. Its spend shows up in `GET /admin/usage`.
@@ -38,3 +38,8 @@ Tests first, then code. Cases, by name:
 - the SSE parser handles events split across chunks and `\r\n` line endings
 
 Gate: `bun run check` (about 5 s) before reporting. Commit as `phase 5 lane a: streaming responses with usage recorded at stream end`.
+
+## Log
+
+- Lane a (opus) landed after one review round (opus code-reviewer, 8 findings, all fixed on the lane): error-body read keeps the timeout; a 2xx is a stream only with `text/event-stream`; a mid-stream provider drop ends the client stream with an Anthropic `event: error` frame and one warn log, still charging usage seen; the lost-charge log carries the whole record; one error-describing helper in `logging.ts`; `Upstream.stream` is required (test doubles delegate to `send`); pass-through responses carry `x-request-id`.
+- `app.ts` changed one line to pass the logger to the messages route, under the brief's exception.

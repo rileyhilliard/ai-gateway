@@ -18,7 +18,7 @@ Product spec: [problem-statement.md](../../problem-statement.md). Build spec, er
 | [2](phase-2-usage-view.md) | Admins see spend per employee | 1 | done (`phase-2`) | |
 | [3](phase-3-admin-controls.md) | Admins change budgets and keys, with a demo clock | 2 | done (`phase-3`) | |
 | [4](phase-4-anthropic-errors.md) | Anthropic-shaped errors for real clients | 1 | done (`phase-4`) | |
-| [5](phase-5-streaming.md) | Streaming, so Claude Code works through the gateway | 4 | running (lane a, opus) | |
+| [5](phase-5-streaming.md) | Streaming, so Claude Code works through the gateway | 4 | done (`phase-5`) | |
 | [6](phase-6-percent-of-pool.md) | Percent-of-pool allowances | 3 | done (`phase-6`) | |
 | [7](phase-7-project-tags.md) | Project tags and spend by project | 2 | done (`phase-7`) | |
 
