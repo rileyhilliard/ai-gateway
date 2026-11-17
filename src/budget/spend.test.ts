@@ -66,3 +66,18 @@ describe("blocked records", () => {
     expect(poolDrawsThisWeek([blocked], "ada", NOW)).toBe(0);
   });
 });
+
+describe("records from a later period", () => {
+  // The clock can be set back (the phase 3 demo clock), leaving records dated after now.
+  it("count toward their own period, not the current one", () => {
+    const tomorrow = new Date("2026-11-19T09:00:00.000Z");
+    const nextWeek = new Date("2026-11-24T09:00:00.000Z");
+    const records = [
+      makeRecord({ costMicros: usd(1), bucket: "personal", startedAt: tomorrow }),
+      makeRecord({ costMicros: usd(2), bucket: "pool", startedAt: nextWeek }),
+    ];
+    expect(personalSpendToday(records, "ada", NOW)).toBe(0);
+    expect(poolDrawsThisWeek(records, "ada", NOW)).toBe(0);
+    expect(companySpendThisWeek(records, "acme", NOW)).toBe(usd(1));
+  });
+});

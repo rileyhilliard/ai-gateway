@@ -34,6 +34,13 @@ describe("weeks", () => {
     expect(weekStart(at("2026-11-23T00:00:00.000Z"))).toEqual(at("2026-11-23T00:00:00.000Z"));
     expect(nextWeekStart(at("2026-11-23T00:00:00.000Z"))).toEqual(at("2026-11-30T00:00:00.000Z"));
   });
+
+  it("finds the Monday in the previous year for a week that spans New Year", () => {
+    const newYearsDay = at("2027-01-01T12:00:00.000Z");
+    expect(weekStart(newYearsDay)).toEqual(at("2026-12-28T00:00:00.000Z"));
+    expect(nextWeekStart(newYearsDay)).toEqual(at("2027-01-04T00:00:00.000Z"));
+    expect(nextDayStart(at("2026-12-31T23:00:00.000Z"))).toEqual(at("2027-01-01T00:00:00.000Z"));
+  });
 });
 
 describe("time zones", () => {
@@ -41,12 +48,28 @@ describe("time zones", () => {
     vi.unstubAllEnvs();
   });
 
-  it.each(["America/Chicago", "Asia/Tokyo"])("gives the same UTC boundaries with TZ=%s", (tz) => {
+  // Each instant falls on a different local day than its UTC day in that zone, so a local-time
+  // method anywhere in periods.ts would move a boundary.
+  it.each([
+    [
+      "America/Chicago",
+      "2026-11-23T01:00:00.000Z",
+      "2026-11-23T00:00:00.000Z",
+      "2026-11-23T00:00:00.000Z",
+    ],
+    [
+      "Asia/Tokyo",
+      "2026-11-22T23:30:00.000Z",
+      "2026-11-22T00:00:00.000Z",
+      "2026-11-16T00:00:00.000Z",
+    ],
+  ])("gives the same UTC boundaries with TZ=%s", (tz, iso, day, week) => {
     // Node re-reads TZ whenever it's assigned, so local-time methods would shift with it.
     vi.stubEnv("TZ", tz);
-    // 23:30 UTC Sunday is already Monday in Tokyo and still Sunday afternoon in Chicago.
-    const lateSunday = at("2026-11-22T23:30:00.000Z");
-    expect(dayStart(lateSunday)).toEqual(at("2026-11-22T00:00:00.000Z"));
-    expect(weekStart(lateSunday)).toEqual(at("2026-11-16T00:00:00.000Z"));
+    const instant = at(iso);
+    expect(dayStart(instant)).toEqual(at(day));
+    expect(nextDayStart(instant)).toEqual(new Date(at(day).getTime() + 86_400_000));
+    expect(weekStart(instant)).toEqual(at(week));
+    expect(nextWeekStart(instant)).toEqual(new Date(at(week).getTime() + 7 * 86_400_000));
   });
 });

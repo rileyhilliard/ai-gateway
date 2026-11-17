@@ -25,6 +25,10 @@ describe("effectiveLimits", () => {
     );
   });
 
+  it("honors a $0 allowance override instead of falling back to the tier", () => {
+    expect(effectiveLimits(capped, { dailyAllowanceMicros: 0 }).dailyAllowanceMicros).toBe(0);
+  });
+
   it("caps an uncapped pool tier with a number override", () => {
     expect(effectiveLimits(uncapped, { poolCapMicros: usd(1) }).overflow).toEqual({
       kind: "pool",

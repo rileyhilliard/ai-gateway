@@ -6,15 +6,7 @@
 import { effectiveLimits } from "./limits.ts";
 import { nextDayStart, nextWeekStart } from "./periods.ts";
 import { companySpendThisWeek, personalSpendToday, poolDrawsThisWeek } from "./spend.ts";
-import type {
-  BlockDecision,
-  Company,
-  Decision,
-  Employee,
-  Micros,
-  Tier,
-  UsageRecord,
-} from "./types.ts";
+import type { Company, Decision, Employee, Tier, UsageRecord } from "./types.ts";
 
 /** Everything the budget rules need for one request. */
 export type DecisionInput = {
@@ -63,24 +55,13 @@ export function decide(input: DecisionInput): Decision {
     return { kind: "allow", bucket: "pool" };
   }
 
-  return poolCapBlock(poolDraws, poolCap, limits.dailyAllowanceMicros, now);
-}
-
-/** The block for an employee whose daily allowance and weekly pool cap are both used up. */
-function poolCapBlock(
-  poolDraws: Micros,
-  poolCap: Micros,
-  dailyAllowance: Micros,
-  now: Date,
-): BlockDecision {
-  // With an allowance, tomorrow's fresh allowance unblocks them. With none, only the weekly
-  // pool-cap reset does.
-  const resetsAt = dailyAllowance > 0 ? nextDayStart(now) : nextWeekStart(now);
   return {
     kind: "block",
     reason: "pool_cap_reached",
     spentMicros: poolDraws,
     limitMicros: poolCap,
-    resetsAt,
+    // With an allowance, tomorrow's fresh allowance unblocks them. With none, only the weekly
+    // pool-cap reset does.
+    resetsAt: limits.dailyAllowanceMicros > 0 ? nextDayStart(now) : nextWeekStart(now),
   };
 }

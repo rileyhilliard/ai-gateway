@@ -14,7 +14,7 @@ Product spec: [problem-statement.md](../../problem-statement.md). Build spec, er
 
 | Phase | Capability | Depends on | Status | Tag |
 | --- | --- | --- | --- | --- |
-| [1](phase-1-gateway-budgets.md) | The gateway enforces tier budgets (MVP), with real inference through OpenRouter | none | in progress | |
+| [1](phase-1-gateway-budgets.md) | The gateway enforces tier budgets (MVP), with real inference through OpenRouter | none | done (`phase-1`) | |
 | [2](phase-2-usage-view.md) | Admins see spend per employee | 1 | planned | |
 | [3](phase-3-admin-controls.md) | Admins change budgets and keys, with a demo clock | 1 (runs alongside 2) | planned | |
 | [4](phase-4-anthropic-errors.md) | Anthropic-shaped errors for real clients | 1 | planned | |
@@ -31,3 +31,5 @@ Phase 1 has full lane briefs and test cases. Later phases get theirs while the p
 - Toolchain: `hono-api` lean preset, gate `bun run check` at about 4s. Commits `7ab0701` (plan) and `cde8d75` (toolchain).
 - Plan DA (fast, 5 findings), all applied in the scaffold: error codes and the `budget` envelope field added to `errors.ts`; the notes sample removed and lane b's pattern reference dropped; `UpstreamUnavailableError` defined concretely in `errors.ts`, and a missing tier tested as a 500; the fake upstream moved from lane b to lane c and the seed values written into the spec; tests added for 401-before-400, malformed JSON, a $0 pool cap and spend exactly at the allowance. The invalid-seed startup exit stays untested, since `main.ts` is outside coverage by the stack's design.
 - Rule 1 runs as route middleware so a bad key is a 401 even when the body is invalid.
+- Phase 1 landed: lanes a (opus), b and c (sonnet) merged clean, no lane sent back. Accepted lane choices: seed cross-field checks run only after the shape check passes; empty-string ids accepted; non-numeric `x-fake-*` headers fall back to defaults; `x-fake-unreachable` fails before any delay; an empty `OPENROUTER_KEY` counts as missing; block tiers skip summing pool draws.
+- Phase 1 review of lane a (no spec violations): spend sums now use a half-open period so records dated after a set-back clock don't count; tests added for a week spanning New Year, `next*` under TZ, a Chicago instant on a different local day, and a $0 allowance override; the pool-cap block is built inline like the other two.

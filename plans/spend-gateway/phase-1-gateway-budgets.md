@@ -1,6 +1,6 @@
 # Phase 1: the gateway enforces tier budgets (MVP)
 
-Status: scaffolded at `6681535`; lanes a, b and c running; inline work committed at `91b7b44`.
+Status: done, tagged `phase-1`. Scaffold `6681535`, inline work `91b7b44`.
 Shared spec, error model and contracts: [spec.md](spec.md). Overview and phase status: [README.md](README.md).
 
 Demo: `bun run dev`, open `http/gateway.http`, pick the "local" REST Client environment, and send the requests top to bottom. Using `fake/model`, they show one request succeeding from personal allowance, one spilling to the pool, one blocked with a 429 explaining why and when it resets, an unknown key getting 401, and an unknown model getting 400. The last request sends a real `deepseek/deepseek-v4.1-flash-1017` prompt through OpenRouter.
