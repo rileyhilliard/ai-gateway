@@ -130,11 +130,10 @@ Layout. Files marked (stack) come from `hono-api`; the rest are new stubs.
       gateway/messages-route.ts POST /v1/messages; maps service results to HTTP
     seed/company.json           demo company Acme ($1 weekly pool); tiers intern ($0.01/day, block), engineer ($0.01/day, pool cap $0.02/week), staff ($0.05/day, uncapped); keys key-intern, key-engineer, key-staff, key-disabled
     http/gateway.http           REST Client requests: allow, spill, block, 401, 400, real inference
-    .vscode/settings.json       REST Client "local" environment: baseUrl, seeded employee keys, dev admin key
     .env.example                PORT_API, SEED_PATH, ADMIN_KEY, OPENROUTER_KEY placeholders
 
 Tests sit next to each module (`src/budget/decide.test.ts`), plus `tests/gateway-http.test.ts` through `app.request()`.
 
 ## `.http` files
 
-Each phase that adds an endpoint adds its requests to `http/`, and a phase isn't done until every request in it returns what its comment says. The files use the REST Client "local" environment from `.vscode/settings.json` (`{{baseUrl}}`, `{{internKey}}`, `{{engineerKey}}`, `{{staffKey}}`, `{{adminKey}}`). The seeded employee keys and the dev admin key are demo values, so they're committed. The OpenRouter key stays server-side in `.env` and never appears in these files. Requests are separated by `###`, each with a `# @name` and a one-line comment saying the expected status and why.
+Each phase that adds an endpoint adds its requests to `http/`, and a phase isn't done until every request in it returns what its comment says. Each file declares its variables at the top (`@baseUrl`, `@internKey`, `@engineerKey`, `@staffKey`, `@disabledKey`, `@adminKey`), so requests work without choosing a REST Client environment. The seeded employee keys and the dev admin key are demo values, so they're committed. The OpenRouter key stays server-side in `.env` and never appears in these files. Requests are separated by `###`, each with a `# @name` and a one-line comment saying the expected status and why.

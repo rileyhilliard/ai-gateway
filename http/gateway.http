@@ -1,8 +1,15 @@
 # Spend gateway: phase 1 requests for the VS Code REST Client extension.
-# Start the server with `bun run dev`, pick the "local" environment, and send these top to bottom.
+# Start the server with `bun run dev` and send these top to bottom.
 # Budgets live in memory, so restart the server to replay the allow, spill and block sequence.
 # fake/model requests go to the in-process fake upstream and cost nothing real. Header
 # x-fake-output-tokens: 10000 makes a request cost $0.011, just over the $0.01 daily allowance.
+
+# Demo values from seed/company.json. The OpenRouter key stays server-side in .env.
+@baseUrl = http://localhost:3000
+@internKey = key-intern
+@engineerKey = key-engineer
+@staffKey = key-staff
+@disabledKey = key-disabled
 
 ### Health check. Expect 200 {"status":"ok"}.
 # @name health

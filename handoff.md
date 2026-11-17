@@ -41,7 +41,7 @@ The company pool is $1 a week. Days reset at 00:00 UTC and weeks at Monday 00:00
 
 ## 4. Send the requests
 
-Open `http/gateway.http`, choose the "local" environment (Command Palette, "Rest Client: Switch Environment"), and click "Send Request" above each one from top to bottom. The comment above each request says what to expect. Here's the same list with what to look for:
+Open `http/gateway.http` and click "Send Request" above each one from top to bottom. The comment above each request says what to expect. Here's the same list with what to look for:
 
 | Request | Expect | What it shows |
 | --- | --- | --- |
