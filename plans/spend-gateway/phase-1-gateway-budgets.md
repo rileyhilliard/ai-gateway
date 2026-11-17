@@ -1,6 +1,6 @@
 # Phase 1: the gateway enforces tier budgets (MVP)
 
-Status: planned.
+Status: scaffolded at `6681535`; lanes a, b and c running; inline work committed at `91b7b44`.
 Shared spec, error model and contracts: [spec.md](spec.md). Overview and phase status: [README.md](README.md).
 
 Demo: `bun run dev`, open `http/gateway.http`, pick the "local" REST Client environment, and send the requests top to bottom. Using `fake/model`, they show one request succeeding from personal allowance, one spilling to the pool, one blocked with a 429 explaining why and when it resets, an unknown key getting 401, and an unknown model getting 400. The last request sends a real `deepseek/deepseek-v4.1-flash-1017` prompt through OpenRouter.
@@ -105,14 +105,16 @@ Test cases, by file:
 - 429 envelope includes `budget.reason`, `spentMicros`, `limitMicros`, ISO `resetsAt`, and a readable message.
 - 502 envelope when upstream is unreachable.
 
-| Lane | Size | Owns files | Reads | Tests | Model | Done when |
-| --- | --- | --- | --- | --- | --- | --- |
-| a | M | `src/budget/periods.ts`, `pricing.ts`, `limits.ts`, `spend.ts`, `decide.ts` | `src/budget/types.ts`, the PRD's decision rules | the five `src/budget/*.test.ts` | opus | budget tests and typecheck pass |
-| b | M | `src/store/memory.ts`, `src/seed/load.ts`, `src/upstream/fake.ts`, `seed/company.json` | `src/budget/types.ts`, `src/store/types.ts`, `src/upstream/types.ts`, `src/services/notes.ts` from the stack as the store pattern | `memory.test.ts`, `load.test.ts`, `fake.test.ts` | sonnet | its tests and typecheck pass |
-| c | S | `src/upstream/openrouter.ts`, `src/upstream/select.ts` | `src/upstream/types.ts`, `src/budget/types.ts` | `openrouter.test.ts`, `select.test.ts` | sonnet | its tests and typecheck pass |
-| inline | M | `src/gateway/*`, `src/app.ts`, `src/main.ts`, `src/config.ts`, `src/errors.ts`, `http/gateway.http`, `.vscode/settings.json`, `.env.example` | all contracts | `service.test.ts`, `tests/gateway-http.test.ts` | me | green after lanes a, b and c merge, and every request in `gateway.http` returns what its comment says |
+| Lane | Size | Owns files | Tests | Model |
+| --- | --- | --- | --- | --- |
+| a | M | `src/budget/periods.ts`, `pricing.ts`, `limits.ts`, `spend.ts`, `decide.ts` | `src/budget/*.test.ts` | opus |
+| b | M | `src/store/memory.ts`, `src/seed/load.ts`, `seed/company.json` | `src/store/memory.test.ts`, `src/seed/load.test.ts`, `tests/seed-file.test.ts` | sonnet |
+| c | M | `src/upstream/fake.ts`, `openrouter.ts`, `select.ts` | `src/upstream/*.test.ts` | sonnet |
+| inline | M | `src/gateway/authenticate.ts`, `src/gateway/service.ts`, `http/gateway.http`, `.vscode/settings.json`, `.env.example` | `tests/gateway-http.test.ts`, `tests/http-contract.test.ts`, `tests/server.test.ts` | me |
 
-The inline lane is written while a, b and c run. Its tests go green only once they merge, since the service calls the real `decide`, memory store and upstreams.
+The scaffold commit also holds the finished `src/errors.ts` (new codes, `BudgetExceededError`, `UpstreamUnavailableError`), `src/gateway/messages-route.ts`, and the wiring in `app.ts`, `config.ts` and `main.ts`. The service tests listed above run through HTTP in `tests/gateway-http.test.ts` rather than a separate `service.test.ts`, since every behavior they check is visible in the response or the store.
+
+The lane briefs below are the plan-time versions. The dispatched briefs moved the fake upstream from lane b to lane c, so each lane covers one capability, and spelled out the seed values and error classes.
 
 ## Lane a brief
 

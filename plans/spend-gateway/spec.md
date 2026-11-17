@@ -87,7 +87,7 @@ export type TokenUsage = { inputTokens: number; outputTokens: number };
 export type UpstreamRequest = { body: unknown; headers: Record<string, string> };
 // costMicros: the provider's own reported cost, when it sends one (OpenRouter's usage.cost)
 export type UpstreamResponse = { status: number; body: unknown; usage: TokenUsage | null; costMicros: Micros | null };
-/** @throws {UpstreamUnavailableError} when the provider can't be reached. */
+/** @throws {UpstreamUnavailableError} (from src/errors.ts) when the provider can't be reached. */
 export interface Upstream { send(request: UpstreamRequest): Promise<UpstreamResponse> }
 ```
 
@@ -121,13 +121,14 @@ Layout. Files marked (stack) come from `hono-api`; the rest are new stubs.
       store/types.ts            Store interface
       store/memory.ts           in-memory Store; the only module holding state
       seed/load.ts              validates parsed seed JSON into store contents, dollars to micros; no file I/O
-      upstream/types.ts         Upstream interface and UpstreamUnavailableError
+      upstream/types.ts         Upstream interface (UpstreamUnavailableError lives in errors.ts, since it renders as the 502 envelope)
       upstream/fake.ts          fake Anthropic upstream driven by x-fake-* headers
       upstream/openrouter.ts    forwards to OpenRouter's /api/v1/messages with the company key; takes fetch as a dependency
       upstream/select.ts        picks fake or OpenRouter by model id prefix
-      gateway/service.ts        one request end to end: key, model price, decide, forward, record
+      gateway/authenticate.ts   rule 1: gateway key to active employee; runs as route middleware before body validation
+      gateway/service.ts        one authenticated request: model price, decide, forward, record
       gateway/messages-route.ts POST /v1/messages; maps service results to HTTP
-    seed/company.json           demo company, tiers, employees and keys
+    seed/company.json           demo company Acme ($1 weekly pool); tiers intern ($0.01/day, block), engineer ($0.01/day, pool cap $0.02/week), staff ($0.05/day, uncapped); keys key-intern, key-engineer, key-staff, key-disabled
     http/gateway.http           REST Client requests: allow, spill, block, 401, 400, real inference
     .vscode/settings.json       REST Client "local" environment: baseUrl, seeded employee keys, dev admin key
     .env.example                PORT_API, SEED_PATH, ADMIN_KEY, OPENROUTER_KEY placeholders
