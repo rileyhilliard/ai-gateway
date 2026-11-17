@@ -8,7 +8,18 @@ import { ConfigError, loadConfig } from "./config.ts";
 
 describe("loadConfig", () => {
   it("uses defaults for an empty environment", () => {
-    expect(loadConfig({})).toEqual({ port: 3000, logLevel: "info", maxBodyBytes: 65_536 });
+    expect(loadConfig({})).toEqual({
+      port: 3000,
+      logLevel: "info",
+      maxBodyBytes: 65_536,
+      seedPath: "seed/company.json",
+      openRouterKey: undefined,
+    });
+  });
+
+  it("reads the seed path and the OpenRouter key", () => {
+    const config = loadConfig({ SEED_PATH: "seed/other.json", OPENROUTER_KEY: "sk-or-test" });
+    expect(config).toMatchObject({ seedPath: "seed/other.json", openRouterKey: "sk-or-test" });
   });
 
   it("prefers PORT_API, falls back to PORT, and treats empty values as unset", () => {
