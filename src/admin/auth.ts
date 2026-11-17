@@ -4,6 +4,7 @@
  */
 
 import { createMiddleware } from "hono/factory";
+import { timingSafeEqual } from "hono/utils/buffer";
 import { UnauthorizedError } from "../errors.ts";
 
 /**
@@ -15,7 +16,10 @@ export function requireAdmin(adminKey: string | undefined) {
   return createMiddleware(async (c, next) => {
     // Checked first so an unset key can't be matched by a missing or empty header.
     if (!adminKey) throw new UnauthorizedError("admin");
-    if (c.req.header("x-admin-key") !== adminKey) throw new UnauthorizedError("admin");
+    // A plain !== returns at the first differing character, so response time would leak how
+    // much of a guess is right. Hono's comparison takes the same time for any wrong key.
+    const sent = c.req.header("x-admin-key") ?? "";
+    if (!(await timingSafeEqual(sent, adminKey))) throw new UnauthorizedError("admin");
     await next();
   });
 }
