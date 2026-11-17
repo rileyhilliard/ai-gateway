@@ -87,7 +87,7 @@ export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
 
   app.doc31("/openapi.json", {
     openapi: "3.1.0",
-    info: { title: "API", version: "1" },
+    info: { title: "Spend gateway", version: "1" },
   });
 
   // A wrong method on a declared path is a miss too: Hono answers both with the 404 envelope.
