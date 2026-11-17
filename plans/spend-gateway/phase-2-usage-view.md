@@ -1,6 +1,6 @@
 # Phase 2: admins see spend per employee
 
-Status: done on `build/spend-gateway-p2`, gate green (163 tests); merging into `build/spend-gateway`.
+Status: done, tagged `phase-2`, landed with phase 3 at `aa5ed2f`.
 Shared spec, error model and contracts: [spec.md](spec.md). Overview and phase status: [README.md](README.md).
 
 Demo: set `ADMIN_KEY=dev-admin-key` in `.env`, run the phase 1 requests, then send `http/admin.http` and open `localhost:3000/admin`. Each employee shows spend today against allowance, pool draws against cap and blocked count; the company shows spend against the pool. The numbers match what the gateway allowed, spilled and blocked.

@@ -88,6 +88,13 @@ The fake upstream takes test headers so you can try other cases: `x-fake-output-
 - No admin view or controls yet; those are phases 2 and 3.
 - Errors use the gateway's own envelope, not Anthropic's shape, so the Anthropic SDKs show them as generic errors. That's phase 4. Streaming is phase 5.
 
-## Phase 2 status
+## Phases 2 and 3
 
-Phase 2 (admins see spend per employee) is being built in a separate worktree at `.claude/worktrees/phase-2` on branch `build/spend-gateway-p2`, so it doesn't change this checkout while you verify. It will need `ADMIN_KEY=dev-admin-key` in `.env`; without it the admin routes answer 401 and phase 1 runs as before.
+Both have landed on `build/spend-gateway` (tags `phase-2` and `phase-3`). To try them, add these to `.env` and restart `bun run dev`:
+
+```sh
+ADMIN_KEY=dev-admin-key   # at least 8 characters, or startup fails
+DEMO_CLOCK=1              # optional: enables POST /admin/clock/advance
+```
+
+Then send some requests from `http/gateway.http` and work through `http/admin.http` top to bottom. Its comments say what each request should return. The usage view is also a page at `localhost:3000/admin`. Without `ADMIN_KEY`, every admin request gets 401 and phase 1 behaves exactly as described above.

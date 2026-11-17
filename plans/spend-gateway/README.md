@@ -15,8 +15,8 @@ Product spec: [problem-statement.md](../../problem-statement.md). Build spec, er
 | Phase | Capability | Depends on | Status | Tag |
 | --- | --- | --- | --- | --- |
 | [1](phase-1-gateway-budgets.md) | The gateway enforces tier budgets (MVP), with real inference through OpenRouter | none | done (`phase-1`) | |
-| [2](phase-2-usage-view.md) | Admins see spend per employee | 1 | in progress (`build/spend-gateway-p2`) | |
-| [3](phase-3-admin-controls.md) | Admins change budgets and keys, with a demo clock | 2 | in progress (`build/spend-gateway-p3`) | |
+| [2](phase-2-usage-view.md) | Admins see spend per employee | 1 | done (`phase-2`) | |
+| [3](phase-3-admin-controls.md) | Admins change budgets and keys, with a demo clock | 2 | done (`phase-3`) | |
 | [4](phase-4-anthropic-errors.md) | Anthropic-shaped errors for real clients | 1 | planned | |
 | [5](phase-5-streaming.md) | Streaming, so Claude Code works through the gateway | 4 | planned | |
 | [6](phase-6-percent-of-pool.md) | Percent-of-pool allowances | 3 | planned | |
@@ -33,3 +33,5 @@ Phase 1 has full lane briefs and test cases. Later phases get theirs while the p
 - Rule 1 runs as route middleware so a bad key is a 401 even when the body is invalid.
 - Phase 1 landed: lanes a (opus), b and c (sonnet) merged clean, no lane sent back. Accepted lane choices: seed cross-field checks run only after the shape check passes; empty-string ids accepted; non-numeric `x-fake-*` headers fall back to defaults; `x-fake-unreachable` fails before any delay; an empty `OPENROUTER_KEY` counts as missing; block tiers skip summing pool draws.
 - Phase 1 review of lane a (no spec violations): spend sums now use a half-open period so records dated after a set-back clock don't count; tests added for a week spanning New Year, `next*` under TZ, a Chicago instant on a different local day, and a $0 allowance override; the pool-cap block is built inline like the other two.
+- Phases 2 and 3 built on their own branches (`build/spend-gateway-p2`, then `-p3` cut from it, since phase 3 extends phase 2's admin key and routes) so the landing checkout stayed untouched while phase 1 was verified by hand, then landed together at `aa5ed2f`. Gate 212 tests.
+- The phase 2 scaffold committed the worktree `node_modules` symlink: the ignore rule `node_modules/` only matches directories. Fixed in `0e0de4a`; the rule is now `node_modules`.

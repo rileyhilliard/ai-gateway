@@ -1,6 +1,6 @@
 # Phase 3: admins change budgets and keys, with a demo clock
 
-Status: done on `build/spend-gateway-p3` (worktree `.claude/worktrees/phase-3`), branched from phase 2 because it extends the admin key check and routes. Gate green (212 tests); waiting to merge with phase 2.
+Status: done on `build/spend-gateway-p3` (worktree `.claude/worktrees/phase-3`), branched from phase 2 because it extends the admin key check and routes. Tagged `phase-3`, landed at `aa5ed2f` (212 tests).
 Shared spec, error model and contracts: [spec.md](spec.md). Overview and phase status: [README.md](README.md).
 
 Demo: with `ADMIN_KEY` set and `DEMO_CLOCK=1`, send the phase 3 section of `http/admin.http`. Lower the pool and watch the next request get 429, move Ivy to another tier and watch her next request spill instead, revoke and reissue Eli's key, and advance the clock 24 hours to see an allowance refill.
