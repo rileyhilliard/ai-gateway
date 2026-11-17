@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createApp } from "./app.ts";
 import { DEFAULT_PRICES } from "./budget/pricing.ts";
+import { createDemoClock } from "./clock/demo-clock.ts";
 import { ConfigError, loadConfig } from "./config.ts";
 import { createLogger } from "./logging.ts";
 import { parseSeed, SeedError } from "./seed/load.ts";
@@ -39,6 +40,10 @@ const logger = createLogger(config.logLevel);
 if (!config.adminKey) {
   logger.warn("ADMIN_KEY is not set, so every admin request will get 401");
 }
+const demoClock = config.demoClock ? createDemoClock(() => new Date()) : undefined;
+if (demoClock) {
+  logger.warn("DEMO_CLOCK is on: POST /admin/clock/advance moves budget time forward");
+}
 const gateway = {
   store: createMemoryStore(seed),
   upstreams: {
@@ -46,10 +51,10 @@ const gateway = {
     openrouter: createOpenRouterUpstream({ apiKey: config.openRouterKey, fetch }),
   },
   prices: DEFAULT_PRICES,
-  clock: () => new Date(),
+  clock: demoClock?.now ?? (() => new Date()),
   newId: randomUUID,
 };
-const server = await startServer(createApp({ config, logger, gateway }), config.port);
+const server = await startServer(createApp({ config, logger, gateway, demoClock }), config.port);
 logger.info({ port: server.port }, "listening");
 
 let stopping = false;

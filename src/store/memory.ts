@@ -16,13 +16,17 @@ export type StoreContents = {
 /** A Store holding `contents` in memory. Reads return copies, so callers can't change state. */
 export function createMemoryStore(contents: StoreContents): Store {
   // Copy on the way in as well, so the caller's arrays can't change stored state either.
-  const company = structuredClone(contents.company);
+  let company = structuredClone(contents.company);
   const tiers = structuredClone(contents.tiers);
   const employees = structuredClone(contents.employees);
   const usage = structuredClone(contents.usage ?? []);
 
   return {
     async getCompany() {
+      return structuredClone(company);
+    },
+    async setWeeklyPool(weeklyPoolMicros) {
+      company = { ...company, weeklyPoolMicros };
       return structuredClone(company);
     },
     async getTier(id) {
@@ -33,6 +37,17 @@ export function createMemoryStore(contents: StoreContents): Store {
     },
     async listEmployees() {
       return structuredClone(employees);
+    },
+    async getEmployee(id) {
+      return structuredClone(employees.find((employee) => employee.id === id));
+    },
+    async updateEmployee(id, changes) {
+      const index = employees.findIndex((employee) => employee.id === id);
+      const current = employees[index];
+      if (!current) return undefined;
+      const updated = { ...current, ...structuredClone(changes) };
+      employees[index] = updated;
+      return structuredClone(updated);
     },
     async findEmployeeByKey(apiKey) {
       return structuredClone(employees.find((employee) => employee.apiKey === apiKey));

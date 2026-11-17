@@ -94,3 +94,39 @@ describe("createMemoryStore", () => {
     expect(again).toMatchObject({ costMicros: 0, startedAt: MONDAY });
   });
 });
+
+describe("admin changes", () => {
+  it("sets the weekly pool", async () => {
+    const store = seededStore();
+    expect(await store.setWeeklyPool(42)).toMatchObject({ weeklyPoolMicros: 42 });
+    expect((await store.getCompany()).weeklyPoolMicros).toBe(42);
+  });
+
+  it("gets an employee by id, and nothing for an unknown id", async () => {
+    const store = seededStore();
+    expect(await store.getEmployee("ada")).toEqual(makeEmployee());
+    expect(await store.getEmployee("nobody")).toBeUndefined();
+  });
+
+  it("changes only the given fields, and the new key finds the employee", async () => {
+    const store = seededStore();
+    const updated = await store.updateEmployee("ada", { apiKey: "key-new", disabled: true });
+    expect(updated).toEqual(makeEmployee({ apiKey: "key-new", disabled: true }));
+    expect(await store.findEmployeeByKey("key-ada")).toBeUndefined();
+    expect(await store.findEmployeeByKey("key-new")).toEqual(updated);
+  });
+
+  it("returns undefined and changes nothing for an unknown employee", async () => {
+    const store = seededStore();
+    expect(await store.updateEmployee("nobody", { disabled: true })).toBeUndefined();
+    expect(await store.listEmployees()).toEqual([makeEmployee()]);
+  });
+
+  it("keeps no link to the changes object the caller passed", async () => {
+    const store = seededStore();
+    const overrides = { dailyAllowanceMicros: 5 };
+    await store.updateEmployee("ada", { overrides });
+    overrides.dailyAllowanceMicros = 99;
+    expect((await store.getEmployee("ada"))?.overrides).toEqual({ dailyAllowanceMicros: 5 });
+  });
+});

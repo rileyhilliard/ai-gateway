@@ -5,6 +5,11 @@
 
 import type { Company, Employee, Tier, UsageRecord } from "../budget/types.ts";
 
+/** The employee fields an admin can change. Omitted fields stay as they are. */
+export type EmployeeChanges = Partial<
+  Pick<Employee, "tierId" | "overrides" | "apiKey" | "disabled">
+>;
+
 /** Company, tier, employee and usage data for the one seeded company. */
 export interface Store {
   /** The seeded company. */
@@ -13,6 +18,12 @@ export interface Store {
   getTier(id: string): Promise<Tier | undefined>;
   /** Every tier, in seed order. */
   listTiers(): Promise<Tier[]>;
+  /** Sets the company's weekly pool and returns the updated company. */
+  setWeeklyPool(weeklyPoolMicros: number): Promise<Company>;
+  /** The employee with this id, or undefined. */
+  getEmployee(id: string): Promise<Employee | undefined>;
+  /** Applies `changes` to the employee and returns it, or undefined when no employee has this id. */
+  updateEmployee(id: string, changes: EmployeeChanges): Promise<Employee | undefined>;
   /** Every employee, disabled ones included, in seed order. */
   listEmployees(): Promise<Employee[]>;
   /** The employee whose active key this is, or undefined. Disabled employees are returned too. */

@@ -1,6 +1,6 @@
 /**
  * Validates environment settings: port, log level, request-body limit, the seed file, the
- * OpenRouter key and the admin key. The process entry loads these values before building the app.
+ * OpenRouter key, the admin key and the demo clock switch. The process entry loads these values before building the app.
  */
 
 import { z } from "@hono/zod-openapi";
@@ -17,6 +17,8 @@ export type AppConfig = {
   openRouterKey: string | undefined;
   /** Without it the app still starts; every admin request gets the 401 envelope. */
   adminKey: string | undefined;
+  /** When on, POST /admin/clock/advance moves the gateway's clock forward. Never for production. */
+  demoClock: boolean;
 };
 
 export class ConfigError extends Error {
@@ -43,6 +45,7 @@ const Env = z.object({
   OPENROUTER_KEY: optional(z.string()),
   // A short or blank key would be easy to guess, so it fails at startup instead.
   ADMIN_KEY: optional(z.string().trim().min(8)),
+  DEMO_CLOCK: optional(z.enum(["0", "1"])),
 });
 
 /** Parses settings from an environment record. Throws ConfigError naming each bad variable. */
@@ -59,5 +62,6 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     seedPath: data.SEED_PATH ?? "seed/company.json",
     openRouterKey: data.OPENROUTER_KEY,
     adminKey: data.ADMIN_KEY,
+    demoClock: data.DEMO_CLOCK === "1",
   };
 }

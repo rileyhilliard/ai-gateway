@@ -44,6 +44,10 @@ describe("health and the OpenAPI document", () => {
     };
     expect(Object.keys(doc.paths).sort()).toEqual([
       "/admin",
+      "/admin/company/pool",
+      "/admin/employees/{id}/key",
+      "/admin/employees/{id}/overrides",
+      "/admin/employees/{id}/tier",
       "/admin/usage",
       "/healthz",
       "/v1/messages",
@@ -111,6 +115,9 @@ describe("errors", () => {
       getTier: unused,
       listTiers: unused,
       listEmployees: unused,
+      setWeeklyPool: unused,
+      getEmployee: unused,
+      updateEmployee: unused,
       findEmployeeByKey: () => Promise.reject(new TypeError("db password=hunter2")),
       listUsageSince: unused,
       addUsage: unused,

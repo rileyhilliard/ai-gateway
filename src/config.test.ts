@@ -15,6 +15,7 @@ describe("loadConfig", () => {
       seedPath: "seed/company.json",
       openRouterKey: undefined,
       adminKey: undefined,
+      demoClock: false,
     });
   });
 
@@ -41,6 +42,12 @@ describe("loadConfig", () => {
     expect(loadConfig({ ADMIN_KEY: "" }).adminKey).toBeUndefined();
     expect(() => loadConfig({ ADMIN_KEY: "   " })).toThrow(ConfigError);
     expect(() => loadConfig({ ADMIN_KEY: "short" })).toThrow(/ADMIN_KEY/);
+  });
+
+  it("turns the demo clock on only for DEMO_CLOCK=1", () => {
+    expect(loadConfig({ DEMO_CLOCK: "1" }).demoClock).toBe(true);
+    expect(loadConfig({ DEMO_CLOCK: "0" }).demoClock).toBe(false);
+    expect(() => loadConfig({ DEMO_CLOCK: "yes" })).toThrow(/DEMO_CLOCK/);
   });
 
   it("reads LOG_LEVEL case-insensitively", () => {

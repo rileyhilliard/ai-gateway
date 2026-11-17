@@ -6,6 +6,7 @@
 import { createApp } from "../../src/app.ts";
 import { DEFAULT_PRICES } from "../../src/budget/pricing.ts";
 import type { Clock } from "../../src/budget/types.ts";
+import { createDemoClock } from "../../src/clock/demo-clock.ts";
 import type { GatewayDeps } from "../../src/gateway/service.ts";
 import { createLogger } from "../../src/logging.ts";
 import { createMemoryStore, type StoreContents } from "../../src/store/memory.ts";
@@ -88,8 +89,15 @@ export const ADMIN_KEY = "admin-test";
  * ADMIN_KEY unless `adminKey` is passed; `adminKey: null` runs the app with no key configured.
  */
 export function testApp(
-  options: { gateway?: GatewayDeps; maxBodyBytes?: number; adminKey?: string | null } = {},
+  options: {
+    gateway?: GatewayDeps;
+    maxBodyBytes?: number;
+    adminKey?: string | null;
+    /** Starts a demo clock at NOW and mounts its route; the gateway reads that clock. */
+    demoClock?: boolean;
+  } = {},
 ) {
+  const demoClock = options.demoClock ? createDemoClock(() => NOW) : undefined;
   const adminKey = options.adminKey === null ? undefined : (options.adminKey ?? ADMIN_KEY);
   const records: LogRecord[] = [];
   const logger = createLogger("debug", {
@@ -97,7 +105,7 @@ export function testApp(
       records.push(JSON.parse(line) as LogRecord);
     },
   });
-  const gateway = options.gateway ?? testGateway();
+  const gateway = options.gateway ?? testGateway(demoClock ? { clock: demoClock.now } : {});
   const app = createApp({
     config: {
       maxBodyBytes: options.maxBodyBytes ?? 65_536,
@@ -105,6 +113,7 @@ export function testApp(
     },
     logger,
     gateway,
+    demoClock,
   });
   const requests = () => records.filter((record) => record.msg === "request");
   return { app, records, requests, gateway };

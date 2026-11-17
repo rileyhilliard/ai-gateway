@@ -5,7 +5,10 @@
 
 import { bodyLimit } from "hono/body-limit";
 import { requestId } from "hono/request-id";
+import { budgetRoutes } from "./admin/budget-routes.ts";
+import { clockRoutes } from "./admin/clock-route.ts";
 import { adminRoutes } from "./admin/usage-route.ts";
+import type { DemoClock } from "./clock/demo-clock.ts";
 import type { AppConfig } from "./config.ts";
 import { AppError, envelope, toAppError } from "./errors.ts";
 import { messagesRoutes } from "./gateway/messages-route.ts";
@@ -18,13 +21,15 @@ export type AppDeps = {
   config: Pick<AppConfig, "maxBodyBytes" | "adminKey">;
   logger: Logger;
   gateway: GatewayDeps;
+  /** Present only when DEMO_CLOCK=1; it must be the clock `gateway.clock` reads. */
+  demoClock?: DemoClock;
 };
 
 /**
  * The whole API as a fetch handler: no Node imports, so the same app serves through
  * src/server.ts on Node and runs in tests through app.request().
  */
-export function createApp({ config, logger, gateway }: AppDeps) {
+export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
   const app = createRouter();
 
   app.use(requestId({ limitLength: 128 }));
@@ -44,6 +49,16 @@ export function createApp({ config, logger, gateway }: AppDeps) {
     "/",
     adminRoutes({ store: gateway.store, clock: gateway.clock, adminKey: config.adminKey }),
   );
+  app.route(
+    "/",
+    budgetRoutes({
+      store: gateway.store,
+      adminKey: config.adminKey,
+      // Keys come from the same generator as record ids: random UUIDs in production.
+      newApiKey: () => `key-${gateway.newId()}`,
+    }),
+  );
+  if (demoClock) app.route("/", clockRoutes({ demoClock, adminKey: config.adminKey }));
 
   app.doc31("/openapi.json", {
     openapi: "3.1.0",
