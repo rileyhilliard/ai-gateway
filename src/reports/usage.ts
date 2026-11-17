@@ -6,8 +6,13 @@
  */
 
 import { effectiveLimits } from "../budget/limits.ts";
-import { nextDayStart, nextWeekStart, weekStart } from "../budget/periods.ts";
-import { companySpendThisWeek, personalSpendToday, poolDrawsThisWeek } from "../budget/spend.ts";
+import { nextDayStart, nextWeekStart } from "../budget/periods.ts";
+import {
+  blockedRequestsThisWeek,
+  companySpendThisWeek,
+  personalSpendToday,
+  poolDrawsThisWeek,
+} from "../budget/spend.ts";
 import type {
   Company,
   Employee,
@@ -100,7 +105,7 @@ function employeeUsage(
     dailyAllowanceMicros: limits.dailyAllowanceMicros,
     overflow: limits.overflow,
     poolDrawsThisWeekMicros: poolDrawsThisWeek(usage, employee.id, now),
-    blockedThisWeek: blockedThisWeek(usage, employee.id, now),
+    blockedThisWeek: blockedRequestsThisWeek(usage, employee.id, now),
   };
 }
 
@@ -115,17 +120,4 @@ function tierOf(employee: Employee, tiers: readonly Tier[]): Tier {
   throw new Error(
     `Employee "${employee.id}" belongs to tier "${employee.tierId}", which doesn't exist. Add the tier to the seed or fix the employee's tierId.`,
   );
-}
-
-/** How many of the employee's requests were blocked in the week containing `now`. */
-function blockedThisWeek(usage: readonly UsageRecord[], employeeId: string, now: Date): number {
-  const start = weekStart(now);
-  const end = nextWeekStart(now);
-  return usage.filter(
-    (record) =>
-      record.employeeId === employeeId &&
-      record.status === "blocked" &&
-      record.startedAt >= start &&
-      record.startedAt < end,
-  ).length;
 }

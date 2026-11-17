@@ -1,6 +1,6 @@
 # Phase 2: admins see spend per employee
 
-Status: scaffolded on `build/spend-gateway-p2` (worktree `.claude/worktrees/phase-2`); one lane running.
+Status: done on `build/spend-gateway-p2`, gate green (163 tests); merging into `build/spend-gateway`.
 Shared spec, error model and contracts: [spec.md](spec.md). Overview and phase status: [README.md](README.md).
 
 Demo: set `ADMIN_KEY=dev-admin-key` in `.env`, run the phase 1 requests, then send `http/admin.http` and open `localhost:3000/admin`. Each employee shows spend today against allowance, pool draws against cap and blocked count; the company shows spend against the pool. The numbers match what the gateway allowed, spilled and blocked.
@@ -15,6 +15,7 @@ Defaults taken without a grill round; override any of them.
 - `ADMIN_KEY` is optional. Unset, every admin request gets 401 and startup logs a warning, so phase 1 keeps running without it.
 - `GET /admin` is an unauthenticated static page. It asks for the admin key, keeps it in `sessionStorage`, and fetches `/admin/usage` with `x-admin-key`. Browsers can't send a custom header on a plain navigation, and the page holds no data itself.
 - Rows reuse `effectiveLimits` and the `spend.ts` sums, so the view can't disagree with the decision rules.
+- `ADMIN_KEY` must be at least 8 characters after trimming; a shorter one fails startup with `ConfigError`.
 - Plain `===` key comparison, the same as employee keys in phase 1. Constant-time comparison is deferred with key hashing.
 
 ## Contracts (in the scaffold)
@@ -40,3 +41,8 @@ Wire shape of `GET /admin/usage`: `{ asOf, dayResetsAt, weekResetsAt, company: {
 | a | M | `src/store/memory.ts`, `src/reports/usage.ts`, `src/admin/auth.ts`, `src/admin/usage-route.ts` | opus |
 
 One lane: the report, auth and route are one capability with a contract seam only at the store, which is two trivial methods.
+
+## Log
+
+- Lane a (opus) landed clean. Accepted choices: dollars shown with 2 to 6 decimals; the key field is a password input; block tiers show "blocked after allowance" instead of a pool figure; reset times shown as ISO strings.
+- Review (no bugs): added tests for an empty admin key, an empty configured key and an empty `ADMIN_KEY` env value; `ADMIN_KEY` minimum length; the test helper takes `adminKey: null` for unset; the blocked count moved into `budget/spend.ts` beside the other sums; the page's key field is a form so Enter submits; the 401 message mentions an unset `ADMIN_KEY`.

@@ -37,6 +37,12 @@ describe("loadConfig", () => {
     expect(loadConfig({ PORT_API: "", PORT: "" }).port).toBe(3000);
   });
 
+  it("treats an empty ADMIN_KEY as unset and rejects one shorter than 8 characters", () => {
+    expect(loadConfig({ ADMIN_KEY: "" }).adminKey).toBeUndefined();
+    expect(() => loadConfig({ ADMIN_KEY: "   " })).toThrow(ConfigError);
+    expect(() => loadConfig({ ADMIN_KEY: "short" })).toThrow(/ADMIN_KEY/);
+  });
+
   it("reads LOG_LEVEL case-insensitively", () => {
     expect(loadConfig({ LOG_LEVEL: "DEBUG" }).logLevel).toBe("debug");
   });

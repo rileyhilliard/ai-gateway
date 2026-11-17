@@ -73,8 +73,10 @@ const ADMIN_PAGE = `<!doctype html>
 </head>
 <body>
 <h1>Usage</h1>
-<label>Admin key <input id="key" type="password" autocomplete="off"></label>
-<button id="load">Load usage</button>
+<form id="keyForm">
+  <label>Admin key <input id="key" type="password" autocomplete="off"></label>
+  <button type="submit">Load usage</button>
+</form>
 <p id="status"></p>
 <p id="company"></p>
 <table hidden id="table">
@@ -132,12 +134,13 @@ const ADMIN_PAGE = `<!doctype html>
     sessionStorage.setItem("adminKey", keyInput.value);
     status.textContent = "";
     const res = await fetch("/admin/usage", { headers: { "x-admin-key": keyInput.value } });
-    if (res.status === 401) { status.textContent = "Wrong admin key."; return; }
+    if (res.status === 401) { status.textContent = "Admin key rejected, or ADMIN_KEY isn't set on the server."; return; }
     if (!res.ok) { status.textContent = "Couldn't load usage (HTTP " + res.status + ")."; return; }
     render(await res.json());
   }
 
-  document.getElementById("load").addEventListener("click", () => {
+  document.getElementById("keyForm").addEventListener("submit", (event) => {
+    event.preventDefault();
     load().catch((error) => { status.textContent = "Couldn't load usage: " + error.message; });
   });
 </script>

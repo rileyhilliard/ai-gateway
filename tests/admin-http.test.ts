@@ -17,7 +17,7 @@ const message = {
 };
 
 const getUsage = (app: App, key: string | null = ADMIN_KEY) =>
-  app.request("/admin/usage", { headers: key ? { "x-admin-key": key } : {} });
+  app.request("/admin/usage", { headers: key === null ? {} : { "x-admin-key": key } });
 
 const send = (app: App, apiKey: string) =>
   app.request("/v1/messages", jsonBody(message, { "x-api-key": apiKey, ...costly }));
@@ -25,6 +25,7 @@ const send = (app: App, apiKey: string) =>
 describe("admin key", () => {
   it.each([
     ["no admin key", null],
+    ["an empty admin key", ""],
     ["a wrong admin key", "nope"],
     ["an employee's gateway key", "key-staff"],
   ])("rejects %s with the 401 envelope", async (_, key) => {
@@ -35,10 +36,15 @@ describe("admin key", () => {
   });
 
   it("rejects every request when ADMIN_KEY isn't configured, even one with no key", async () => {
-    const { app } = testApp({ adminKey: undefined });
+    const { app } = testApp({ adminKey: null });
     expect((await getUsage(app, null)).status).toBe(401);
     expect((await getUsage(app, "")).status).toBe(401);
     expect((await getUsage(app, "undefined")).status).toBe(401);
+  });
+
+  it("never treats an empty configured key as a match for an empty header", async () => {
+    const { app } = testApp({ adminKey: "" });
+    expect((await getUsage(app, "")).status).toBe(401);
   });
 });
 

@@ -41,6 +41,19 @@ export function poolDrawsThisWeek(
   );
 }
 
+/** How many of one employee's requests were blocked this week. */
+export function blockedRequestsThisWeek(
+  records: readonly UsageRecord[],
+  employeeId: string,
+  now: Date,
+): number {
+  const week = thisWeek(now);
+  return records.filter(
+    (record) =>
+      record.status === "blocked" && record.employeeId === employeeId && isIn(record, week),
+  ).length;
+}
+
 /** A half-open time window: `start` is inside it, `end` is not. */
 type Period = { start: Date; end: Date };
 
@@ -64,9 +77,13 @@ function sumAllowedCostsIn(
   let total = 0;
   for (const record of records) {
     if (record.status !== "allowed") continue;
-    if (record.startedAt < period.start || record.startedAt >= period.end) continue;
+    if (!isIn(record, period)) continue;
     if (!matches(record)) continue;
     total += record.costMicros;
   }
   return total;
+}
+
+function isIn(record: UsageRecord, period: Period): boolean {
+  return record.startedAt >= period.start && record.startedAt < period.end;
 }

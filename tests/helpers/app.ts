@@ -85,11 +85,12 @@ export const ADMIN_KEY = "admin-test";
 
 /**
  * A fresh app with its own store and a logger whose records the test can read. The admin key is
- * ADMIN_KEY unless `adminKey` is passed, and `adminKey: undefined` leaves it unset.
+ * ADMIN_KEY unless `adminKey` is passed; `adminKey: null` runs the app with no key configured.
  */
 export function testApp(
-  options: { gateway?: GatewayDeps; maxBodyBytes?: number; adminKey?: string | undefined } = {},
+  options: { gateway?: GatewayDeps; maxBodyBytes?: number; adminKey?: string | null } = {},
 ) {
+  const adminKey = options.adminKey === null ? undefined : (options.adminKey ?? ADMIN_KEY);
   const records: LogRecord[] = [];
   const logger = createLogger("debug", {
     write: (line: string) => {
@@ -100,7 +101,7 @@ export function testApp(
   const app = createApp({
     config: {
       maxBodyBytes: options.maxBodyBytes ?? 65_536,
-      adminKey: "adminKey" in options ? options.adminKey : ADMIN_KEY,
+      adminKey,
     },
     logger,
     gateway,

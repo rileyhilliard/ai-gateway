@@ -41,7 +41,8 @@ const Env = z.object({
   MAX_BODY_BYTES: optional(z.coerce.number().int().positive()),
   SEED_PATH: optional(z.string()),
   OPENROUTER_KEY: optional(z.string()),
-  ADMIN_KEY: optional(z.string()),
+  // A short or blank key would be easy to guess, so it fails at startup instead.
+  ADMIN_KEY: optional(z.string().trim().min(8)),
 });
 
 /** Parses settings from an environment record. Throws ConfigError naming each bad variable. */
