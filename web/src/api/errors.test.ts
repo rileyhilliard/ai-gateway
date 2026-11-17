@@ -21,12 +21,13 @@ test.each([
 });
 
 test.each([
-  [new ApiError({ kind: "network", path: "/items" }), "Couldn't reach the server"],
+  [new ApiError({ kind: "network", path: "/items" }), "Can't reach the gateway"],
+  [http(502), "Can't reach the gateway"],
+  [http(504), "Can't reach the gateway"],
   [new ApiError({ kind: "decode", path: "/items", status: 200 }), "can't read"],
-  [http(401), "don't have access"],
-  [http(404), "Not found."],
-  [http(502), "The server had a problem."],
-  [http(422), "The request failed."],
+  [http(401), "Set ADMIN_KEY (8+ characters) in the repo's .env"],
+  [http(500), "The gateway answered with HTTP 500."],
+  [http(404), "The gateway answered with HTTP 404."],
   ["thrown string", "Something went wrong."],
 ])("userMessage(%s) says %s", (error, expected) => {
   expect(userMessage(error)).toContain(expected);

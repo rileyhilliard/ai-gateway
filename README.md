@@ -9,7 +9,7 @@ Needs Node 24 (`.node-version`) and Bun 1.4.
 ```sh
 bun install
 cp .env.example .env   # then set OPENROUTER_KEY
-bun run dev            # serves on http://localhost:3000
+bun run dev            # gateway on http://localhost:3000, dashboard in the browser
 ```
 
 Send requests from the `.http` files in `http/` with the VS Code REST Client extension.
@@ -18,13 +18,14 @@ Send requests from the `.http` files in `http/` with the VS Code REST Client ext
 
 | Command | What it does |
 | --- | --- |
-| `bun run dev` | Run from source on Node, restarting on change |
+| `bun run dev` | Run the gateway and the dashboard (`web/`) together and open the dashboard; Ctrl-C stops both |
+| `bun run dev:api` | Run only the gateway from source on Node, restarting on change |
 | `bun run build` / `bun run start` | Bundle to `dist/main.js` / run the bundle |
 | `bun run lint` / `bun run format` | Biome check / apply fixes |
 | `bun run typecheck` | tsc over the app, tests and tooling |
 | `bun run test` | Vitest once; `bun run test src/config.test.ts` for one file |
 | `bun run coverage` | Vitest with coverage |
-| `bun run check` | The gate: lint, typecheck, tests, build |
+| `bun run check` | The gate: lint, typecheck, tests, build, then the dashboard's lint, typecheck and tests |
 
 ## Configuration
 

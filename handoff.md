@@ -102,3 +102,13 @@ Then send some requests from `http/gateway.http` and work through `http/admin.ht
 ## Phase 6: percent-of-pool allowances
 
 Tagged `phase-6`. The seed now has a Contractor tier whose daily allowance is 5% of the weekly pool, and Cal (`key-contractor`) on it. With the $1 pool that's $0.05 a day, then blocked. Send requests as `key-contractor` with `x-fake-output-tokens: 10000` ($0.011 each): the fifth is allowed and the sixth is a 429 with `limitMicros: 50000`. Then `PUT /admin/company/pool` with `{"weeklyPoolUsd": 2}` and send again: the allowance is now $0.10 and the request goes through, with no change to the tier. `GET /admin/usage` shows Cal's `dailyAllowanceMicros` move with the pool.
+
+## Dashboard
+
+An executive spend dashboard lives in `web/` (React on Vite). `bun run dev` at the root now starts the gateway and the dashboard together and opens it in the browser; Ctrl-C stops both, and if either one exits the other stops too. The gateway alone is `bun run dev:api`.
+
+1. Put `ADMIN_KEY` (8+ characters) in the root `.env`. The Vite dev proxy adds it as `x-admin-key` on `/api/*` requests, which it forwards to `http://localhost:${PORT_API:-3000}`. The key stays in the dev server and never reaches the browser bundle.
+2. `bun run dev`, then send requests from `http/gateway.http`. The page polls `GET /admin/usage` every 2 seconds: the pool panel's projection, the cost ranking, the people table and "Needs attention" update as you go. Ivy turns "At limit" after `internFirst`, and `internBlocked` adds her to "Needs attention".
+3. Stop the gateway and the header goes amber, "Stale since ...", with the last numbers kept on screen. Start it again and it goes back to "Live".
+
+Without `ADMIN_KEY`, the page says the gateway rejected the admin key and how to set it. `bun run check` at the root also runs the dashboard's lint, typecheck and unit tests; its browser tests are `bun run e2e` in `web/`.

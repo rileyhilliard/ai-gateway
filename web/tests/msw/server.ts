@@ -1,24 +1,16 @@
 /**
- * Defines the in-process MSW API used by Vitest's client and component tests. Default item
- * handlers read shared fixtures, and individual tests can override responses.
+ * Defines the in-process MSW gateway used by Vitest's client and component tests. The default
+ * handler serves the usage fixture, and individual tests can override responses.
  */
 
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
-import { items } from "../fixtures/items";
+import { usageReport } from "../fixtures/usage";
 
 /** The API base tests use: the app's default, a same-origin path. */
 export const TEST_API_URL = "/api";
 
-/** The fake API's default answers. A test changes one with server.use(...) for its own case. */
-export const handlers = [
-  http.get("*/api/items", () => HttpResponse.json({ items })),
-  http.get("*/api/items/:id", ({ params }) => {
-    const item = items.find((candidate) => candidate.id === params.id);
-    return item
-      ? HttpResponse.json(item)
-      : HttpResponse.json({ message: "Not found" }, { status: 404 });
-  }),
-];
+/** The fake gateway's default answers. A test changes one with server.use(...) for its own case. */
+export const handlers = [http.get("*/api/admin/usage", () => HttpResponse.json(usageReport))];
 
 export const server = setupServer(...handlers);
