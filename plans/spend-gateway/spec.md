@@ -31,8 +31,8 @@ Assumptions (defaults taken without asking; override any of them):
 | Body isn't JSON, or `model` missing or not a string | 400 | `bad_request` | `issues` | no |
 | `model` not in the price table | 400 | `unknown_model` | none | no |
 | Budget rule 3 or 6 | 429 | `budget_exceeded` | `budget: { reason, spentMicros, limitMicros, resetsAt }` | yes, as blocked |
-| Upstream returns an error status | upstream's status | upstream body passed through | none | only if usage reported |
-| Upstream unreachable, or OpenRouter key not configured | 502 | `upstream_unavailable` | none | no |
+| Upstream returns an error status | upstream's status | upstream body passed through; `retry-after` too on 429 and 529 | none | only if usage reported |
+| Upstream unreachable, OpenRouter key not configured, OpenRouter rejects the company key (401) or the account is out of credits (402) | 502 | `upstream_unavailable` | none; the warn log's cause says what to fix | no |
 | Seed file missing or invalid at startup | process exits 1 | n/a | zod issues with paths, logged | n/a |
 | Anything else | 500 | `internal` | none | no |
 

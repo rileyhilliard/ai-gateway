@@ -6,7 +6,7 @@ The executive spend dashboard for the spend gateway in the repo root. A React si
 
 Needs Node 24 and Bun 1.4. From the repo root, put `ADMIN_KEY` (8+ characters) in `.env` and run `bun run dev`: it starts the gateway and this app together and opens the dashboard. Ctrl-C stops both.
 
-In development, Vite proxies `/api/*` to the gateway at `http://localhost:${PORT_API:-3000}` and adds `x-admin-key` from the root `.env`'s `ADMIN_KEY` (`vite.config.ts`, read with `loadEnv`). The key stays in the dev server, never in the bundle.
+In development, Vite proxies `GET /api/admin/usage` to the gateway at `http://localhost:${PORT_API:-3000}` and adds `x-admin-key` from the root `.env`'s `ADMIN_KEY` (`vite.config.ts`, read with `loadEnv`). The key stays in the dev server, never in the bundle. Every other `/api` request gets a 404 from Vite, so a page in another tab can't use the proxy's key to change budgets or reissue keys (`tests/gateway-proxy.test.ts`).
 
 ## Commands
 

@@ -4,7 +4,7 @@
  */
 
 import { createApp } from "../../src/app.ts";
-import { DEFAULT_PRICES } from "../../src/budget/pricing.ts";
+import { priceTable } from "../../src/budget/pricing.ts";
 import type { Clock } from "../../src/budget/types.ts";
 import { createDemoClock } from "../../src/clock/demo-clock.ts";
 import type { GatewayDeps } from "../../src/gateway/service.ts";
@@ -61,19 +61,24 @@ export function demoContents(): StoreContents {
   };
 }
 
-/** Gateway dependencies for tests. Ids count up from gen-1 so records are easy to assert. */
+/**
+ * Gateway dependencies for tests. Ids count up from gen-1 so records are easy to assert. The fake
+ * upstream and its `fake/` models are on, as FAKE_UPSTREAM=1 would have them, unless
+ * `fakeUpstream` is false.
+ */
 export function testGateway(
-  options: { store?: Store; openrouter?: Upstream; clock?: Clock } = {},
+  options: { store?: Store; openrouter?: Upstream; clock?: Clock; fakeUpstream?: boolean } = {},
 ): GatewayDeps {
   let idCount = 0;
+  const fakeUpstream = options.fakeUpstream ?? true;
   const upstreams: Upstreams = {
-    fake: createFakeUpstream(),
+    ...(fakeUpstream ? { fake: createFakeUpstream() } : {}),
     openrouter: options.openrouter ?? createFakeUpstream(),
   };
   return {
     store: options.store ?? createMemoryStore(demoContents()),
     upstreams,
-    prices: DEFAULT_PRICES,
+    prices: priceTable({ fakeModels: fakeUpstream }),
     clock: options.clock ?? (() => NOW),
     newId: () => {
       idCount += 1;

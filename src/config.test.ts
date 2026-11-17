@@ -11,11 +11,12 @@ describe("loadConfig", () => {
     expect(loadConfig({})).toEqual({
       port: 3000,
       logLevel: "info",
-      maxBodyBytes: 65_536,
+      maxBodyBytes: 10_485_760,
       seedPath: "seed/company.json",
       openRouterKey: undefined,
       adminKey: undefined,
       demoClock: false,
+      fakeUpstream: true,
     });
   });
 
@@ -48,6 +49,19 @@ describe("loadConfig", () => {
     expect(loadConfig({ DEMO_CLOCK: "1" }).demoClock).toBe(true);
     expect(loadConfig({ DEMO_CLOCK: "0" }).demoClock).toBe(false);
     expect(() => loadConfig({ DEMO_CLOCK: "yes" })).toThrow(/DEMO_CLOCK/);
+  });
+
+  it("turns the fake upstream on by default, and off when NODE_ENV is production", () => {
+    expect(loadConfig({}).fakeUpstream).toBe(true);
+    expect(loadConfig({ NODE_ENV: "development" }).fakeUpstream).toBe(true);
+    expect(loadConfig({ NODE_ENV: "production" }).fakeUpstream).toBe(false);
+  });
+
+  it("lets FAKE_UPSTREAM override the NODE_ENV default either way", () => {
+    expect(loadConfig({ FAKE_UPSTREAM: "0" }).fakeUpstream).toBe(false);
+    expect(loadConfig({ NODE_ENV: "production", FAKE_UPSTREAM: "1" }).fakeUpstream).toBe(true);
+    expect(loadConfig({ NODE_ENV: "production", FAKE_UPSTREAM: "" }).fakeUpstream).toBe(false);
+    expect(() => loadConfig({ FAKE_UPSTREAM: "yes" })).toThrow(/FAKE_UPSTREAM/);
   });
 
   it("reads LOG_LEVEL case-insensitively", () => {

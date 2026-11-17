@@ -19,6 +19,7 @@ import type {
 } from "../budget/types.ts";
 import { BadRequestError, BudgetExceededError, UnknownModelError } from "../errors.ts";
 import type { Store } from "../store/types.ts";
+import { readFakeControls } from "../upstream/fake.ts";
 import { selectUpstream, type Upstreams } from "../upstream/select.ts";
 import {
   isUpstreamStream,
@@ -60,7 +61,7 @@ export type StreamSettlement = { end: StreamEnd; recording: RecordingOutcome };
  * ends, after the response has started, so `settled` resolves then; it never rejects.
  */
 export type MessageResponse =
-  | { kind: "json"; status: number; body: unknown }
+  | { kind: "json"; status: number; body: unknown; retryAfter?: string }
   | {
       kind: "stream";
       status: number;
@@ -82,7 +83,8 @@ const MAX_PROJECT_TAG_LENGTH = 64;
 /**
  * Handles one request after authentication.
  *
- * @throws {BadRequestError} When the x-project tag is too long. Nothing is recorded.
+ * @throws {BadRequestError} When the x-project tag is too long, or an `x-fake-*` header is out of
+ * range. Nothing is recorded.
  * @throws {UnknownModelError} When the model has no price. Nothing is recorded.
  * @throws {BudgetExceededError} When a budget rule blocks the request. A blocked record is written.
  * @throws {UpstreamUnavailableError} When the upstream can't be reached. Nothing is recorded.
@@ -101,6 +103,9 @@ export async function handleMessage(
 
   const price = priceFor(deps.prices, body.model);
   if (!price) throw new UnknownModelError(body.model, Object.keys(deps.prices));
+  // Checked here rather than left to the fake upstream, so a bad x-fake-* header fails before
+  // the budget decision and can't write a blocked record or a negative or infinite cost.
+  readFakeControls(request.headers);
 
   const tier = await store.getTier(employee.tierId);
   if (!tier) {
@@ -137,7 +142,8 @@ export async function handleMessage(
     response.usage ? { usage: response.usage, costMicros: response.costMicros } : null,
   );
   if (record) await store.addUsage(record);
-  return { kind: "json", status: response.status, body: response.body };
+  const { status, body: responseBody, retryAfter } = response;
+  return { kind: "json", status, body: responseBody, ...(retryAfter ? { retryAfter } : {}) };
 }
 
 /** Writes the record, reporting a store failure as a value with the record that was lost. */

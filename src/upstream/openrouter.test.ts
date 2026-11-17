@@ -268,3 +268,58 @@ describe("createOpenRouterUpstream streaming", () => {
     await expect(streaming).rejects.toMatchObject({ cause: { name: "TimeoutError" } });
   });
 });
+
+describe("OpenRouter account errors", () => {
+  const accountError = (status: number, message: string) =>
+    jsonResponse({ error: { code: status, message } }, status);
+
+  // Both paths, since a stream request that fails comes back as a plain error response too.
+  const callers = [
+    [
+      "send",
+      (fetch: typeof globalThis.fetch) =>
+        createOpenRouterUpstream({ apiKey: "k", fetch }).send({ body: messageBody, headers: {} }),
+    ],
+    [
+      "stream",
+      (fetch: typeof globalThis.fetch) =>
+        createOpenRouterUpstream({ apiKey: "k", fetch }).stream({
+          body: { ...messageBody, stream: true },
+          headers: {},
+        }),
+    ],
+  ] as const;
+
+  describe.each(callers)("from %s", (_, call) => {
+    it("turn a rejected company key (401) into UpstreamUnavailableError naming OPENROUTER_KEY", async () => {
+      const { fetch } = stubFetch(accountError(401, "User not found."));
+      const sending = call(fetch);
+      await expect(sending).rejects.toThrow(UpstreamUnavailableError);
+      await expect(sending).rejects.toMatchObject({
+        cause: { message: "OpenRouter rejected the company key (401); check OPENROUTER_KEY." },
+      });
+    });
+
+    it("turn an account out of credits (402) into UpstreamUnavailableError", async () => {
+      const { fetch } = stubFetch(accountError(402, "Insufficient credits"));
+      const sending = call(fetch);
+      await expect(sending).rejects.toThrow(UpstreamUnavailableError);
+      await expect(sending).rejects.toMatchObject({
+        cause: {
+          message: "OpenRouter account is out of credits (402); add credits on openrouter.ai.",
+        },
+      });
+    });
+
+    it("pass a moderation refusal (403) through, since it's about the request, not the account", async () => {
+      const body = { error: { code: 403, message: "Input was flagged" } };
+      const { fetch } = stubFetch(jsonResponse(body, 403));
+      expect(await call(fetch)).toEqual({ status: 403, body, usage: null, costMicros: null });
+    });
+
+    it.each([429, 529])("pass retry-after through on a %i", async (status) => {
+      const { fetch } = stubFetch(new Response("{}", { status, headers: { "retry-after": "30" } }));
+      expect(await call(fetch)).toMatchObject({ status, retryAfter: "30" });
+    });
+  });
+});

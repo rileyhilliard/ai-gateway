@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { UpstreamUnavailableError } from "../src/errors.ts";
 import { AnthropicErrorBody } from "../src/gateway/anthropic-errors.ts";
 import { createMemoryStore } from "../src/store/memory.ts";
+import { createOpenRouterUpstream } from "../src/upstream/openrouter.ts";
 import type { Upstream, UpstreamRequest } from "../src/upstream/types.ts";
 import { demoContents, jsonBody, testApp, testGateway } from "./helpers/app.ts";
 import { makeEmployee, makeRecord, NOW, usd } from "./helpers/fixtures.ts";
@@ -155,6 +156,18 @@ describe("model check (rule 2)", () => {
     expect(sent).toHaveLength(0);
     expect(await recordsOf(gateway)).toEqual([]);
   });
+
+  it("rejects fake/ models as unknown when the fake upstream is off (FAKE_UPSTREAM=0)", async () => {
+    const { app, gateway } = testApp({ gateway: testGateway({ fakeUpstream: false }) });
+    const res = await post(app, "key-staff", costly);
+    expect(res.status).toBe(400);
+    expect(await errorOf(res)).toMatchObject({
+      code: "unknown_model",
+      message:
+        'Model "fake/model" isn\'t available through the gateway. Use one of: deepseek/deepseek-v4.1-flash-1017, anthropic/claude-sonnet-5.5.',
+    });
+    expect(await recordsOf(gateway)).toEqual([]);
+  });
 });
 
 describe("budget outcomes", () => {
@@ -275,6 +288,122 @@ describe("upstream failures", () => {
         cause: { errorClass: "TypeError", message: "fetch failed" },
       }),
     ]);
+  });
+});
+
+describe("OpenRouter answers about the company account", () => {
+  const realModel = { ...message, model: "deepseek/deepseek-v4.1-flash-1017" };
+  /** The real OpenRouter upstream over a fetch that always answers `response`. */
+  const openRouterAnswering = (response: Response) =>
+    createOpenRouterUpstream({ apiKey: "sk-or-test", fetch: async () => response });
+
+  it("gives the employee a 502, not a 401 about their key, when the company key is rejected", async () => {
+    const openrouter = openRouterAnswering(
+      new Response(JSON.stringify({ error: { code: 401, message: "User not found." } }), {
+        status: 401,
+      }),
+    );
+    const { app, gateway, records } = testApp({ gateway: testGateway({ openrouter }) });
+    const res = await post(app, "key-staff", {}, realModel);
+    expect(res.status).toBe(502);
+    expect(await errorOf(res)).toMatchObject({ type: "api_error", code: "upstream_unavailable" });
+    expect(records.filter((record) => record.msg === "upstream unavailable")).toEqual([
+      expect.objectContaining({
+        level: "warn",
+        cause: {
+          errorClass: "Error",
+          message: "OpenRouter rejected the company key (401); check OPENROUTER_KEY.",
+        },
+      }),
+    ]);
+    expect(await recordsOf(gateway)).toEqual([]);
+  });
+
+  it("passes OpenRouter's retry-after through on a 429", async () => {
+    const openrouter = openRouterAnswering(
+      new Response("{}", { status: 429, headers: { "retry-after": "12" } }),
+    );
+    const { app } = testApp({ gateway: testGateway({ openrouter }) });
+    const res = await post(app, "key-staff", {}, realModel);
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBe("12");
+  });
+});
+
+describe("fake upstream headers", () => {
+  const TOKENS = "must be a whole number from 0 to 10000000.";
+  it.each([
+    ["x-fake-input-tokens", "-100000000", TOKENS],
+    ["x-fake-output-tokens", "Infinity", TOKENS],
+    ["x-fake-output-tokens", "lots", TOKENS],
+    ["x-fake-input-tokens", "1.5", TOKENS],
+    ["x-fake-input-tokens", "10000001", TOKENS],
+    ["x-fake-status", "999", "must be 200, or a whole number from 400 to 599."],
+    ["x-fake-status", "204", "must be 200, or a whole number from 400 to 599."],
+    ["x-fake-status", "error", "must be 200, or a whole number from 400 to 599."],
+    ["x-fake-delay-ms", "10001", "must be a whole number from 0 to 10000."],
+    ["x-fake-delay-ms", "-1", "must be a whole number from 0 to 10000."],
+    ["x-fake-drop-after", "-1", "must be a whole number from 0 to 1000."],
+  ])(
+    "reject %s: %s with a 400 naming the allowed range, recording nothing",
+    async (name, value, rule) => {
+      const { app, gateway } = testApp();
+      const res = await post(app, "key-staff", { [name]: value });
+      expect(res.status).toBe(400);
+      expect(await errorOf(res)).toMatchObject({
+        code: "bad_request",
+        issues: [{ path: `header.${name}`, message: `${name} ${rule}` }],
+      });
+      expect(await recordsOf(gateway)).toEqual([]);
+    },
+  );
+
+  it("checks the headers before the budget decision, so a blocked employee gets the 400", async () => {
+    const { app, gateway } = testApp();
+    await post(app, "key-intern", costly);
+    const res = await post(app, "key-intern", { "x-fake-input-tokens": "-1" });
+    expect(res.status).toBe(400);
+    expect(await recordsOf(gateway)).toHaveLength(1);
+  });
+
+  it("checks them on a streaming request too", async () => {
+    const { app } = testApp();
+    const res = await post(
+      app,
+      "key-staff",
+      { "x-fake-output-tokens": "-1" },
+      {
+        ...message,
+        stream: true,
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("lists every bad header at once", async () => {
+    const { app } = testApp();
+    const res = await post(app, "key-staff", {
+      "x-fake-input-tokens": "-1",
+      "x-fake-status": "999",
+    });
+    expect((await errorOf(res)).issues?.map((issue) => issue.path)).toEqual([
+      "header.x-fake-input-tokens",
+      "header.x-fake-status",
+    ]);
+  });
+
+  it("accepts the edges of each range", async () => {
+    const { app, gateway } = testApp();
+    const res = await post(app, "key-staff", {
+      "x-fake-input-tokens": "0",
+      "x-fake-output-tokens": "10000000",
+      "x-fake-delay-ms": "0",
+    });
+    expect(res.status).toBe(200);
+    expect(await recordsOf(gateway)).toMatchObject([{ inputTokens: 0, outputTokens: 10_000_000 }]);
+    // A fresh app, since $10 of output tokens just emptied the first one's pool.
+    const fresh = testApp().app;
+    expect((await post(fresh, "key-staff", { "x-fake-status": "599" })).status).toBe(599);
   });
 });
 

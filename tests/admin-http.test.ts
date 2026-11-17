@@ -28,6 +28,9 @@ describe("admin key", () => {
     ["an empty admin key", ""],
     ["a wrong admin key", "nope"],
     ["an employee's gateway key", "key-staff"],
+    ["the admin key with its last character changed", `${ADMIN_KEY.slice(0, -1)}X`],
+    ["a prefix of the admin key", ADMIN_KEY.slice(0, -1)],
+    ["the admin key with extra characters", `${ADMIN_KEY}x`],
   ])("rejects %s with the 401 envelope", async (_, key) => {
     const { app } = testApp();
     const res = await getUsage(app, key);

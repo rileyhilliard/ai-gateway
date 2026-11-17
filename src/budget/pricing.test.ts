@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { costMicros, DEFAULT_PRICES, priceFor } from "./pricing.ts";
+import { costMicros, MODEL_PRICES, priceFor, priceTable } from "./pricing.ts";
 
 describe("costMicros", () => {
   it("charges a million input tokens at the per-million input price", () => {
@@ -31,18 +31,35 @@ describe("costMicros", () => {
 
 describe("priceFor", () => {
   it("returns the price of an accepted model", () => {
-    expect(priceFor(DEFAULT_PRICES, "fake/model")).toEqual({
+    expect(priceFor(priceTable({ fakeModels: true }), "fake/model")).toEqual({
       inputMicrosPerMTok: 1_000_000,
       outputMicrosPerMTok: 1_000_000,
     });
-    expect(priceFor(DEFAULT_PRICES, "deepseek/deepseek-v4.1-flash-1017")).toBeDefined();
+    expect(priceFor(MODEL_PRICES, "deepseek/deepseek-v4.1-flash-1017")).toBeDefined();
   });
 
   it("returns undefined for a model the gateway doesn't accept", () => {
-    expect(priceFor(DEFAULT_PRICES, "openai/gpt-unknown")).toBeUndefined();
+    expect(priceFor(MODEL_PRICES, "openai/gpt-unknown")).toBeUndefined();
   });
 
   it("doesn't treat inherited object keys as models", () => {
-    expect(priceFor(DEFAULT_PRICES, "toString")).toBeUndefined();
+    expect(priceFor(MODEL_PRICES, "toString")).toBeUndefined();
+  });
+});
+
+describe("priceTable", () => {
+  it("accepts fake/ models only when they're turned on", () => {
+    expect(priceFor(priceTable({ fakeModels: false }), "fake/model")).toBeUndefined();
+    expect(priceFor(priceTable({ fakeModels: true }), "fake/model")).toBeDefined();
+  });
+
+  it("keeps the real models either way", () => {
+    for (const fakeModels of [true, false]) {
+      expect(priceTable({ fakeModels })).toMatchObject(MODEL_PRICES);
+    }
+  });
+
+  it("never lists a fake/ model among the real ones", () => {
+    expect(Object.keys(MODEL_PRICES).filter((model) => model.startsWith("fake/"))).toEqual([]);
   });
 });

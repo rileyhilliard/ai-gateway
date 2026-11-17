@@ -34,7 +34,9 @@ Open `.env` and set these:
 | `DEMO_CLOCK` | `1` (optional) | Lets you move the gateway's clock forward, so you can watch daily allowances refill without waiting for midnight UTC. |
 | `OPENROUTER_KEY` | your key (optional) | Real inference through OpenRouter. Without it, real model ids get a 502 and `fake/` models work as usual. |
 
-`PORT_API` (default 3000) moves the gateway to another port if 3000 is taken.
+`PORT_API` (default 3000) moves the gateway to another port if 3000 is taken. `MAX_BODY_BYTES` (default 10485760, 10 MB) is the largest request body before a 413; Claude Code's requests need well over 64 KB.
+
+`FAKE_UPSTREAM` turns the `fake/` models on (`1`) or off (`0`). It defaults to on, which is what `bun dev` and the tests use, and to off when `NODE_ENV=production`, which `bun run start` sets. Keep it off anywhere real money is tracked: the `x-fake-*` headers let the caller choose a request's token counts, and so its cost. With it off, `fake/model` is an unknown model (400). The gateway logs a warning at startup while it's on.
 
 ## Run it
 
@@ -47,7 +49,7 @@ This starts two processes and opens the dashboard in your browser:
 - the gateway on `http://localhost:3000`, with its logs in the terminal
 - the dashboard on `http://localhost:5173` (Vite picks the next free port if 5173 is taken)
 
-The dashboard talks to the gateway through Vite's dev proxy: requests to `/api/*` go to the gateway with the `x-admin-key` header added from your `.env`. The admin key stays in the dev server and never reaches the browser.
+The dashboard talks to the gateway through Vite's dev proxy, which forwards exactly one request: `GET /api/admin/usage` goes to the gateway's `GET /admin/usage` with the `x-admin-key` header added from your `.env`. The admin key stays in the dev server and never reaches the browser. Every other `/api` request gets a 404 from Vite and never reaches the gateway, because any website you visit can send requests to localhost and the proxy would add the key to them. To change budgets or keys, call the gateway directly with `http/admin.http`.
 
 Ctrl-C stops both. If either one crashes, the other is stopped too. Set `BROWSER=none` in your shell (`BROWSER=none bun dev`) to skip opening a browser tab, and run `bun run dev:api` to start the gateway on its own.
 
@@ -218,7 +220,8 @@ Claude Code's requests appear on the dashboard under Sam. The gateway doesn't im
 | The dashboard says "The gateway rejected the admin key" | `ADMIN_KEY` is missing from `.env` or shorter than 8 characters. Set it and restart `bun dev`. |
 | The dashboard says "Can't reach the gateway" | The gateway isn't running or crashed at startup. Its error is in the terminal. |
 | The gateway exits with "Invalid configuration" | A variable in `.env` has a bad value. The message names it. |
-| A real model returns 502 `upstream_unavailable` | `OPENROUTER_KEY` isn't set, or OpenRouter couldn't be reached. Use a `fake/` model, or set the key. |
+| A real model returns 502 `upstream_unavailable` | `OPENROUTER_KEY` isn't set, OpenRouter couldn't be reached, or OpenRouter refused the company key or account; the gateway's warning log says which. Use a `fake/` model, or fix the key. |
+| `fake/model` returns 400 `unknown_model` | The fake upstream is off: `bun run start` sets `NODE_ENV=production`. Use `bun dev`, or set `FAKE_UPSTREAM=1` for a demo. |
 
 ## Run the checks
 

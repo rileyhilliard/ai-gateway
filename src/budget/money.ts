@@ -21,7 +21,10 @@ export function usdToMicros(usd: number): Micros {
 
 /** Converts a provider's reported cost in dollars (OpenRouter's `usage.cost`), rounding up. */
 export function providerCostToMicros(usd: number): Micros {
-  return Math.ceil(usd * MICROS_PER_DOLLAR);
+  // The product carries float noise (0.000123 * 1e6 is 123.00000000000001). Rounding it to six
+  // decimals first drops the noise, so the ceiling only rounds up a real fraction of a micro.
+  const micros = Number((usd * MICROS_PER_DOLLAR).toFixed(6));
+  return Math.ceil(micros);
 }
 
 /** Micro-dollars as dollars with two decimals, for messages: 10_000 is "$0.01". */
