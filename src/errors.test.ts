@@ -12,6 +12,7 @@ import {
   envelope,
   NotFoundError,
   toAppError,
+  UnknownModelError,
 } from "./errors.ts";
 
 describe("toAppError", () => {
@@ -85,4 +86,11 @@ describe("BudgetExceededError", () => {
     });
     expect(error.message.startsWith(start)).toBe(true);
   });
+});
+
+it("quotes at most 100 characters of an unknown model id", () => {
+  const error = new UnknownModelError("m".repeat(500), ["fake/model"]);
+  expect(error.message).toBe(
+    `Model "${"m".repeat(100)}..." isn't available through the gateway. Use one of: fake/model.`,
+  );
 });

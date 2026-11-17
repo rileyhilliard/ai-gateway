@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { UpstreamUnavailableError } from "../src/errors.ts";
 import { AnthropicErrorBody } from "../src/gateway/anthropic-errors.ts";
 import { createMemoryStore } from "../src/store/memory.ts";
 import type { Upstream, UpstreamRequest } from "../src/upstream/types.ts";
@@ -118,7 +119,10 @@ describe("key check (rule 1)", () => {
     const { app, gateway } = testApp();
     const res = await post(app, key);
     expect(res.status).toBe(401);
-    expect((await errorOf(res)).code).toBe("unauthorized");
+    expect(await errorOf(res)).toMatchObject({
+      code: "unauthorized",
+      message: "Missing or invalid API key. Send your gateway key in the x-api-key header.",
+    });
     expect(await recordsOf(gateway)).toEqual([]);
   });
 
@@ -144,7 +148,11 @@ describe("model check (rule 2)", () => {
     const { app, gateway } = testApp({ gateway: testGateway({ openrouter: upstream }) });
     const res = await post(app, "key-staff", {}, { ...message, model: "openai/gpt-unknown" });
     expect(res.status).toBe(400);
-    expect((await errorOf(res)).code).toBe("unknown_model");
+    expect(await errorOf(res)).toMatchObject({
+      code: "unknown_model",
+      message:
+        'Model "openai/gpt-unknown" isn\'t available through the gateway. Use one of: fake/model, deepseek/deepseek-v4.1-flash-1017, anthropic/claude-sonnet-5.5.',
+    });
     expect(sent).toHaveLength(0);
     expect(await recordsOf(gateway)).toEqual([]);
   });
@@ -245,6 +253,30 @@ describe("upstream failures", () => {
     expect(res.status).toBe(502);
     expect((await errorOf(res)).code).toBe("upstream_unavailable");
     expect(await recordsOf(gateway)).toEqual([]);
+  });
+
+  it("logs why the upstream couldn't be reached, once, as a warning", async () => {
+    const failing: Upstream = {
+      send: async () => {
+        throw new UpstreamUnavailableError(new TypeError("fetch failed"));
+      },
+    };
+    const { app, records } = testApp({ gateway: testGateway({ openrouter: failing }) });
+    const res = await post(
+      app,
+      "key-staff",
+      {},
+      { ...message, model: "deepseek/deepseek-v4.1-flash-1017" },
+    );
+    const requestId = res.headers.get("x-request-id");
+    const logged = records.filter((record) => record.msg === "upstream unavailable");
+    expect(logged).toEqual([
+      expect.objectContaining({
+        level: "warn",
+        requestId,
+        cause: { errorClass: "TypeError", message: "fetch failed" },
+      }),
+    ]);
   });
 });
 

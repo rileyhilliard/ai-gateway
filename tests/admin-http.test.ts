@@ -32,7 +32,10 @@ describe("admin key", () => {
     const { app } = testApp();
     const res = await getUsage(app, key);
     expect(res.status).toBe(401);
-    expect(ErrorEnvelope.parse(await res.json()).error.code).toBe("unauthorized");
+    expect(ErrorEnvelope.parse(await res.json()).error).toMatchObject({
+      code: "unauthorized",
+      message: "Missing or invalid admin key. Send it in the x-admin-key header.",
+    });
   });
 
   it("rejects every request when ADMIN_KEY isn't configured, even one with no key", async () => {

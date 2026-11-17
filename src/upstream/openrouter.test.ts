@@ -138,4 +138,34 @@ describe("createOpenRouterUpstream", () => {
     ).rejects.toThrow(UpstreamUnavailableError);
     expect(sent).toHaveLength(0);
   });
+
+  it("throws UpstreamUnavailableError when the connection drops while reading the body", async () => {
+    const dropped = new TypeError("terminated");
+    const body = new ReadableStream({
+      start(controller) {
+        controller.error(dropped);
+      },
+    });
+    const { fetch } = stubFetch(new Response(body, { status: 200 }));
+    const sending = createOpenRouterUpstream({ apiKey: "k", fetch }).send({
+      body: messageBody,
+      headers: {},
+    });
+    await expect(sending).rejects.toThrow(UpstreamUnavailableError);
+    await expect(sending).rejects.toMatchObject({ cause: dropped });
+  });
+
+  it("gives up with UpstreamUnavailableError when OpenRouter doesn't answer in time", async () => {
+    // A fetch that only settles when its signal aborts, like a provider that never responds.
+    const hanging = ((_: unknown, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+      })) as typeof fetch;
+    const sending = createOpenRouterUpstream({ apiKey: "k", fetch: hanging, timeoutMs: 20 }).send({
+      body: messageBody,
+      headers: {},
+    });
+    await expect(sending).rejects.toThrow(UpstreamUnavailableError);
+    await expect(sending).rejects.toMatchObject({ cause: { name: "TimeoutError" } });
+  });
 });

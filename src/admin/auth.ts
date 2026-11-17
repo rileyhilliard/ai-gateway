@@ -14,8 +14,8 @@ import { UnauthorizedError } from "../errors.ts";
 export function requireAdmin(adminKey: string | undefined) {
   return createMiddleware(async (c, next) => {
     // Checked first so an unset key can't be matched by a missing or empty header.
-    if (!adminKey) throw new UnauthorizedError();
-    if (c.req.header("x-admin-key") !== adminKey) throw new UnauthorizedError();
+    if (!adminKey) throw new UnauthorizedError("admin");
+    if (c.req.header("x-admin-key") !== adminKey) throw new UnauthorizedError("admin");
     await next();
   });
 }

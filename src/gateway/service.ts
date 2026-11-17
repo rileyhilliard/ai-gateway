@@ -67,7 +67,7 @@ export async function handleMessage(
   const startedAt = deps.clock();
 
   const price = priceFor(deps.prices, body.model);
-  if (!price) throw new UnknownModelError();
+  if (!price) throw new UnknownModelError(body.model, Object.keys(deps.prices));
 
   const tier = await store.getTier(employee.tierId);
   if (!tier) {

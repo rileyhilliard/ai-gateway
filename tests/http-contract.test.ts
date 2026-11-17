@@ -18,12 +18,16 @@ const message = {
 const withKey = { "x-api-key": "key-staff" };
 
 /** Checks a `/v1/*` error: Anthropic's shape, with the gateway's code and the table's message. */
-async function expectAnthropicError(res: Response, code: keyof typeof errorTable) {
+async function expectAnthropicError(
+  res: Response,
+  code: keyof typeof errorTable,
+  { message = errorTable[code].message as string } = {},
+) {
   expect(res.status).toBe(errorTable[code].status);
   expect(res.headers.get("content-type")).toMatch(/^application\/json/);
   const body = AnthropicErrorBody.parse(await res.json());
   expect(body.error.code).toBe(code);
-  expect(body.error.message).toBe(errorTable[code].message);
+  expect(body.error.message).toBe(message);
   expect(body.request_id).toBe(res.headers.get("x-request-id"));
   return body;
 }
@@ -106,7 +110,10 @@ describe("errors", () => {
       "/v1/messages",
       jsonBody({ ...message, pad: "x".repeat(200) }, withKey),
     );
-    await expectAnthropicError(res, "payload_too_large");
+    const body = await expectAnthropicError(res, "payload_too_large", {
+      message: "Request body is over the 64-byte limit.",
+    });
+    expect(body.error.type).toBe("request_too_large");
   });
 
   it.each([

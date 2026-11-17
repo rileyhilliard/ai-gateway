@@ -37,6 +37,9 @@ try {
 }
 
 const logger = createLogger(config.logLevel);
+if (!config.openRouterKey) {
+  logger.warn("OPENROUTER_KEY is not set, so requests for non-fake models will get 502");
+}
 if (!config.adminKey) {
   logger.warn("ADMIN_KEY is not set, so every admin request will get 401");
 }
@@ -69,7 +72,8 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     server.close().then(
       () => process.exit(0),
       (error: unknown) => {
-        logger.error({ errorClass: (error as Error).constructor.name }, "close failed");
+        const errorClass = error instanceof Error ? error.constructor.name : typeof error;
+        logger.error({ errorClass }, "close failed");
         process.exit(1);
       },
     );

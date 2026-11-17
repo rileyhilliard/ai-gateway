@@ -17,11 +17,18 @@ export const errorTable = {
   unauthorized: { status: 401, message: "Missing or invalid API key." },
   not_found: { status: 404, message: "Resource not found." },
   payload_too_large: { status: 413, message: "Request body is too large." },
-  unsupported_media_type: { status: 415, message: "Expected a JSON body." },
+  unsupported_media_type: {
+    status: 415,
+    message: "Expected a JSON body. Send content-type: application/json.",
+  },
   // The 429 message is built per request from the budget details; this one is the fallback.
   budget_exceeded: { status: 429, message: "Spend limit reached." },
   internal: { status: 500, message: "Internal server error." },
-  upstream_unavailable: { status: 502, message: "The inference provider couldn't be reached." },
+  upstream_unavailable: {
+    status: 502,
+    message:
+      "The inference provider couldn't be reached. Try again shortly; if it keeps failing, give your admin the request id.",
+  },
 } as const;
 
 export type ErrorCode = keyof typeof errorTable;
@@ -77,17 +84,32 @@ export class BadRequestError extends AppError {
   }
 }
 
-/** The request had no gateway key, an unknown or revoked one, or the employee is disabled. */
+const MAX_ECHOED_MODEL = 100;
+
+const UNAUTHORIZED_MESSAGES = {
+  gateway: "Missing or invalid API key. Send your gateway key in the x-api-key header.",
+  admin: "Missing or invalid admin key. Send it in the x-admin-key header.",
+} as const;
+
+/**
+ * The request had no key, an unknown or revoked one, or the employee is disabled. The message
+ * names the header to send, which differs for the gateway and the admin API.
+ */
 export class UnauthorizedError extends AppError {
-  constructor() {
-    super("unauthorized");
+  constructor(credential: keyof typeof UNAUTHORIZED_MESSAGES = "gateway") {
+    super("unauthorized", { message: UNAUTHORIZED_MESSAGES[credential] });
   }
 }
 
 /** The requested model isn't in the price table, so the gateway can't cost it. */
 export class UnknownModelError extends AppError {
-  constructor() {
-    super("unknown_model");
+  constructor(model: string, available: readonly string[]) {
+    // The body allows any length of model id; quote enough to recognize it, not all of it.
+    const shown =
+      model.length > MAX_ECHOED_MODEL ? `${model.slice(0, MAX_ECHOED_MODEL)}...` : model;
+    super("unknown_model", {
+      message: `Model "${shown}" isn't available through the gateway. Use one of: ${available.join(", ")}.`,
+    });
   }
 }
 

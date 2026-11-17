@@ -59,7 +59,9 @@ export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
     bodyLimit({
       maxSize: config.maxBodyBytes,
       onError: () => {
-        throw new AppError("payload_too_large");
+        throw new AppError("payload_too_large", {
+          message: `Request body is over the ${config.maxBodyBytes}-byte limit.`,
+        });
       },
     }),
   );
@@ -104,6 +106,13 @@ export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
         "unhandled error",
       );
     }
+    if (appError.code === "upstream_unavailable") {
+      // A warning, since the client got a 502 it can retry; the cause says what to fix.
+      logger.warn(
+        { requestId: c.get("requestId"), cause: describeCause(appError.cause) },
+        "upstream unavailable",
+      );
+    }
     return renderError(c, appError);
   });
 
@@ -111,3 +120,9 @@ export function createApp({ config, logger, gateway, demoClock }: AppDeps) {
 }
 
 export type App = ReturnType<typeof createApp>;
+
+/** The class and message of an upstream failure's cause, for the log. */
+function describeCause(cause: unknown): { errorClass: string; message: string } | undefined {
+  if (!(cause instanceof Error)) return undefined;
+  return { errorClass: cause.constructor.name, message: cause.message };
+}
