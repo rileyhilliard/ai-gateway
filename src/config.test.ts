@@ -14,12 +14,21 @@ describe("loadConfig", () => {
       maxBodyBytes: 65_536,
       seedPath: "seed/company.json",
       openRouterKey: undefined,
+      adminKey: undefined,
     });
   });
 
-  it("reads the seed path and the OpenRouter key", () => {
-    const config = loadConfig({ SEED_PATH: "seed/other.json", OPENROUTER_KEY: "sk-or-test" });
-    expect(config).toMatchObject({ seedPath: "seed/other.json", openRouterKey: "sk-or-test" });
+  it("reads the seed path, the OpenRouter key and the admin key", () => {
+    const config = loadConfig({
+      SEED_PATH: "seed/other.json",
+      OPENROUTER_KEY: "sk-or-test",
+      ADMIN_KEY: "admin-test",
+    });
+    expect(config).toMatchObject({
+      seedPath: "seed/other.json",
+      openRouterKey: "sk-or-test",
+      adminKey: "admin-test",
+    });
   });
 
   it("prefers PORT_API, falls back to PORT, and treats empty values as unset", () => {

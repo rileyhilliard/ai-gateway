@@ -81,8 +81,15 @@ export function testGateway(
   };
 }
 
-/** A fresh app with its own store and a logger whose records the test can read. */
-export function testApp(options: { gateway?: GatewayDeps; maxBodyBytes?: number } = {}) {
+export const ADMIN_KEY = "admin-test";
+
+/**
+ * A fresh app with its own store and a logger whose records the test can read. The admin key is
+ * ADMIN_KEY unless `adminKey` is passed, and `adminKey: undefined` leaves it unset.
+ */
+export function testApp(
+  options: { gateway?: GatewayDeps; maxBodyBytes?: number; adminKey?: string | undefined } = {},
+) {
   const records: LogRecord[] = [];
   const logger = createLogger("debug", {
     write: (line: string) => {
@@ -91,7 +98,10 @@ export function testApp(options: { gateway?: GatewayDeps; maxBodyBytes?: number 
   });
   const gateway = options.gateway ?? testGateway();
   const app = createApp({
-    config: { maxBodyBytes: options.maxBodyBytes ?? 65_536 },
+    config: {
+      maxBodyBytes: options.maxBodyBytes ?? 65_536,
+      adminKey: "adminKey" in options ? options.adminKey : ADMIN_KEY,
+    },
     logger,
     gateway,
   });

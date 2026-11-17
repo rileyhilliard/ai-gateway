@@ -28,6 +28,12 @@ export function createMemoryStore(contents: StoreContents): Store {
     async getTier(id) {
       return structuredClone(tiers.find((tier) => tier.id === id));
     },
+    async listTiers() {
+      throw new Error("not implemented");
+    },
+    async listEmployees() {
+      throw new Error("not implemented");
+    },
     async findEmployeeByKey(apiKey) {
       return structuredClone(employees.find((employee) => employee.apiKey === apiKey));
     },

@@ -29,6 +29,27 @@ function seededStore() {
 }
 
 describe("createMemoryStore", () => {
+  it("lists tiers and employees in seed order, disabled employees included", async () => {
+    const store = createMemoryStore({
+      company: makeCompany(),
+      tiers: [makeTier({ id: "b" }), makeTier({ id: "a" })],
+      employees: [makeEmployee({ id: "zed", disabled: true }), makeEmployee({ id: "amy" })],
+    });
+    expect((await store.listTiers()).map((tier) => tier.id)).toEqual(["b", "a"]);
+    expect((await store.listEmployees()).map((employee) => employee.id)).toEqual(["zed", "amy"]);
+  });
+
+  it("returns lists the caller can't use to change stored state", async () => {
+    const store = seededStore();
+    const [tier] = await store.listTiers();
+    const [employee] = await store.listEmployees();
+    if (!tier || !employee) throw new Error("seeded store is empty");
+    tier.dailyAllowanceMicros = 0;
+    employee.overrides.dailyAllowanceMicros = 0;
+    expect(await store.listTiers()).toEqual([makeTier()]);
+    expect(await store.listEmployees()).toEqual([makeEmployee()]);
+  });
+
   it("returns the company", async () => {
     expect(await seededStore().getCompany()).toEqual(makeCompany());
   });

@@ -36,6 +36,9 @@ try {
 }
 
 const logger = createLogger(config.logLevel);
+if (!config.adminKey) {
+  logger.warn("ADMIN_KEY is not set, so every admin request will get 401");
+}
 const gateway = {
   store: createMemoryStore(seed),
   upstreams: {

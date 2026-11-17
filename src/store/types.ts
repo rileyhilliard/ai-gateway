@@ -11,6 +11,10 @@ export interface Store {
   getCompany(): Promise<Company>;
   /** The tier with this id, or undefined. */
   getTier(id: string): Promise<Tier | undefined>;
+  /** Every tier, in seed order. */
+  listTiers(): Promise<Tier[]>;
+  /** Every employee, disabled ones included, in seed order. */
+  listEmployees(): Promise<Employee[]>;
   /** The employee whose active key this is, or undefined. Disabled employees are returned too. */
   findEmployeeByKey(apiKey: string): Promise<Employee | undefined>;
   /** The company's usage records with `startedAt` at or after `since`, oldest first. */

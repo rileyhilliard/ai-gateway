@@ -5,6 +5,7 @@
 
 import { bodyLimit } from "hono/body-limit";
 import { requestId } from "hono/request-id";
+import { adminRoutes } from "./admin/usage-route.ts";
 import type { AppConfig } from "./config.ts";
 import { AppError, envelope, toAppError } from "./errors.ts";
 import { messagesRoutes } from "./gateway/messages-route.ts";
@@ -14,7 +15,7 @@ import { createRouter } from "./router.ts";
 import { healthRoutes } from "./routes/health.ts";
 
 export type AppDeps = {
-  config: Pick<AppConfig, "maxBodyBytes">;
+  config: Pick<AppConfig, "maxBodyBytes" | "adminKey">;
   logger: Logger;
   gateway: GatewayDeps;
 };
@@ -39,6 +40,10 @@ export function createApp({ config, logger, gateway }: AppDeps) {
 
   app.route("/", healthRoutes());
   app.route("/", messagesRoutes(gateway));
+  app.route(
+    "/",
+    adminRoutes({ store: gateway.store, clock: gateway.clock, adminKey: config.adminKey }),
+  );
 
   app.doc31("/openapi.json", {
     openapi: "3.1.0",

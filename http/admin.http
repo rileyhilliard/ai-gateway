@@ -1,0 +1,26 @@
+# Spend gateway: phase 2 admin requests for the VS Code REST Client extension.
+# Set ADMIN_KEY=dev-admin-key in .env, start the server with `bun run dev`, send some requests
+# from http/gateway.http, then send these. Money is in micro-dollars: 10000 is $0.01.
+# The same view as a page: open http://localhost:3000/admin and enter the admin key.
+
+@baseUrl = http://localhost:3000
+@adminKey = dev-admin-key
+
+### Usage view. Expect 200: company spend against the $1 pool, then one row per employee with
+### today's personal spend, this week's pool draws and blocked count.
+# @name usage
+GET {{baseUrl}}/admin/usage
+x-admin-key: {{adminKey}}
+
+### No admin key. Expect 401 unauthorized.
+# @name usageNoKey
+GET {{baseUrl}}/admin/usage
+
+### An employee's gateway key isn't an admin key. Expect 401 unauthorized.
+# @name usageEmployeeKey
+GET {{baseUrl}}/admin/usage
+x-admin-key: key-staff
+
+### The admin page. Expect 200 HTML with no data in it; the page fetches /admin/usage itself.
+# @name adminPage
+GET {{baseUrl}}/admin
