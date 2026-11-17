@@ -1,6 +1,6 @@
 /**
- * Validates environment settings for the API's port, log level and request-body limit. The
- * process entry loads these values before building the app and starting its server.
+ * Validates environment settings: port, log level, request-body limit, the seed file and the
+ * OpenRouter key. The process entry loads these values before building the app.
  */
 
 import { z } from "@hono/zod-openapi";
@@ -11,6 +11,10 @@ export type AppConfig = {
   logLevel: LogLevel;
   /** Requests with a larger body get the 413 envelope. */
   maxBodyBytes: number;
+  /** Path of the seed JSON, relative to the working directory. */
+  seedPath: string;
+  /** Without it the app still starts; requests for real models get the 502 envelope. */
+  openRouterKey: string | undefined;
 };
 
 export class ConfigError extends Error {
@@ -33,6 +37,8 @@ const Env = z.object({
     ),
   ),
   MAX_BODY_BYTES: optional(z.coerce.number().int().positive()),
+  SEED_PATH: optional(z.string()),
+  OPENROUTER_KEY: optional(z.string()),
 });
 
 /** Parses settings from an environment record. Throws ConfigError naming each bad variable. */
@@ -46,5 +52,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     port: data.PORT_API ?? data.PORT ?? 3000,
     logLevel: data.LOG_LEVEL ?? "info",
     maxBodyBytes: data.MAX_BODY_BYTES ?? 65_536,
+    seedPath: data.SEED_PATH ?? "seed/company.json",
+    openRouterKey: data.OPENROUTER_KEY,
   };
 }

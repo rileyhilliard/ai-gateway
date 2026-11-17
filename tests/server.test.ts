@@ -1,6 +1,6 @@
 /**
  * Exercises the Node server over a real socket on an assigned free port. These tests cover
- * health, note creation and closing the server beyond the in-process HTTP contract.
+ * health, a messages request through the fake upstream, and closing the server.
  */
 
 import { afterEach, expect, it } from "vitest";
@@ -13,7 +13,7 @@ afterEach(async () => {
   server = undefined;
 });
 
-it("serves health and a created note over HTTP", async () => {
+it("serves health and a messages request over HTTP", async () => {
   const { app } = testApp();
   server = await startServer(app, 0);
   const base = `http://127.0.0.1:${server.port}`;
@@ -22,13 +22,10 @@ it("serves health and a created note over HTTP", async () => {
   expect(health.status).toBe(200);
   expect(await health.json()).toEqual({ status: "ok" });
 
-  const created = await fetch(`${base}/v1/notes`, jsonBody({ title: "Over the wire" }));
-  expect(created.status).toBe(201);
-  const location = created.headers.get("location");
-  expect(location).toMatch(/^\/v1\/notes\//);
-
-  const fetched = await fetch(`${base}${location}`);
-  expect(await fetched.json()).toMatchObject({ title: "Over the wire" });
+  const body = { model: "fake/model", max_tokens: 64, messages: [{ role: "user", content: "hi" }] };
+  const reply = await fetch(`${base}/v1/messages`, jsonBody(body, { "x-api-key": "key-staff" }));
+  expect(reply.status).toBe(200);
+  expect(await reply.json()).toMatchObject({ type: "message", content: [{ text: "Fake reply." }] });
 });
 
 it("close() stops the server", async () => {

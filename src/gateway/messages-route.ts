@@ -1,0 +1,60 @@
+/**
+ * Declares POST /v1/messages, the Anthropic Messages endpoint employees call. It authenticates
+ * the key before the body is validated, then hands the request to the gateway service and
+ * passes the upstream's response through unchanged.
+ */
+
+import { createRoute, z } from "@hono/zod-openapi";
+import { createMiddleware } from "hono/factory";
+import type { Employee } from "../budget/types.ts";
+import { errorResponse } from "../errors.ts";
+import { createRouter } from "../router.ts";
+import { authenticate } from "./authenticate.ts";
+import { type GatewayDeps, handleMessage } from "./service.ts";
+
+// Loose, because every other Messages field (messages, max_tokens, system, tools) is forwarded
+// to the provider as sent. The gateway itself only needs the model.
+const MessagesRequest = z.looseObject({ model: z.string().min(1) }).openapi("MessagesRequest");
+
+const json = <T>(schema: T) => ({ "application/json": { schema } });
+
+/** Resolves the employee before the body validator runs, so rule 1 comes first. */
+const requireEmployee = (store: GatewayDeps["store"]) =>
+  createMiddleware<{ Variables: { employee: Employee } }>(async (c, next) => {
+    c.set("employee", await authenticate(store, c.req.header("x-api-key")));
+    await next();
+  });
+
+/** The messages router, bound to the gateway's dependencies. */
+export function messagesRoutes(deps: GatewayDeps) {
+  const messages = createRoute({
+    method: "post",
+    path: "/v1/messages",
+    operationId: "createMessage",
+    middleware: [requireEmployee(deps.store)] as const,
+    request: { body: { content: json(MessagesRequest), required: true } },
+    responses: {
+      // No content schema: the body is whatever the provider sent, error statuses included. Leaving
+      // it out also lets the handler return the provider's response as a plain Response.
+      200: { description: "The provider's response, passed through unchanged" },
+      400: errorResponse("Invalid body or a model the gateway doesn't accept"),
+      401: errorResponse("Missing, unknown or revoked key, or a disabled employee"),
+      429: errorResponse("A budget limit blocked the request"),
+      502: errorResponse("The inference provider couldn't be reached"),
+    },
+  });
+
+  return createRouter().openapi(messages, async (c) => {
+    const upstream = await handleMessage(deps, {
+      employee: c.get("employee"),
+      body: c.req.valid("json"),
+      headers: c.req.header(),
+    });
+    // The provider's status (including its own errors such as 529) and body go back as they came.
+    const isText = typeof upstream.body === "string";
+    return new Response(isText ? String(upstream.body) : JSON.stringify(upstream.body), {
+      status: upstream.status,
+      headers: { "content-type": isText ? "text/plain; charset=utf-8" : "application/json" },
+    });
+  });
+}
