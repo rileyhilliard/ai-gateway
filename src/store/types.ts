@@ -10,6 +10,17 @@ export type EmployeeChanges = Partial<
   Pick<Employee, "tierId" | "overrides" | "apiKey" | "disabled">
 >;
 
+/**
+ * What a store starts with. The seed loader produces this shape, so it lives with the contract
+ * rather than with any one implementation.
+ */
+export type StoreContents = {
+  company: Company;
+  tiers: Tier[];
+  employees: Employee[];
+  usage?: UsageRecord[];
+};
+
 /** Company, tier, employee and usage data for the one seeded company. */
 export interface Store {
   /** The seeded company. */
