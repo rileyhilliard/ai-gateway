@@ -1,9 +1,22 @@
 /**
- * Pins the header's UTC reset time, countdown and freshness text.
+ * Pins the header's UTC reset time, countdown, week range and freshness text.
  */
 
 import { expect, test } from "vitest";
-import { formatAge, formatClockTime, formatCountdown, formatResetTime } from "./time";
+import {
+  formatAge,
+  formatClockTime,
+  formatCountdown,
+  formatResetTime,
+  formatWeekRange,
+} from "./time";
+
+test.each([
+  ["2026-11-23T00:00:00.000Z", "16–22 Nov"],
+  ["2026-12-07T00:00:00.000Z", "30 Nov – 6 Dec"],
+])("the week that resets at %s runs %s", (resetsAt, expected) => {
+  expect(formatWeekRange(resetsAt)).toBe(expected);
+});
 
 test("the reset time is a UTC weekday and clock time", () => {
   expect(formatResetTime("2026-11-23T00:00:00.000Z")).toBe("Mon 00:00 UTC");

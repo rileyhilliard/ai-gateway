@@ -9,30 +9,38 @@ import { formatMoney, formatPercent, ratioOf } from "./money";
 
 const UNTAGGED = "(no project)";
 
-/** The project panel. The gateway already sorts projects by spend, untagged last on ties. */
+/** The project list. The gateway already sorts projects by spend, untagged last on ties. */
 export function ProjectSpend(props: { projects: readonly ProjectUsage[] }) {
   const { projects } = props;
   const total = projects.reduce((sum, project) => sum + project.spentThisWeekMicros, 0);
   const anyTagged = projects.some((project) => project.projectTag !== null);
   return (
-    <section aria-labelledby="projects-heading" className="panel">
-      <h2 id="projects-heading">Spend by project</h2>
+    <section aria-labelledby="projects-heading" className="section">
+      <div className="section-head">
+        <h2 id="projects-heading">Spend by project</h2>
+      </div>
       {projects.length > 0 && (
-        <ol className="bar-list">
+        <ol className="project-list">
           {projects.map((project) => {
             const label = project.projectTag ?? UNTAGGED;
             const money = formatMoney(project.spentThisWeekMicros);
             const share = ratioOf(project.spentThisWeekMicros, total);
             return (
-              <li key={label} className="bar-row">
-                <span className="bar-label">{label}</span>
-                <DotBar
-                  fraction={share}
-                  tone="rank"
-                  label={`${label}: ${money}, ${formatPercent(share)} of project spend`}
-                />
-                <span className="bar-value">{money}</span>
-                <span className="bar-detail">
+              <li key={label} className="project-row">
+                <span
+                  className={project.projectTag === null ? "project-name quiet" : "project-name"}
+                >
+                  {label}
+                </span>
+                <span className="figure project-money">{money}</span>
+                <span className="project-bar">
+                  <DotBar
+                    fraction={share}
+                    tone="share"
+                    label={`${label}: ${money}, ${formatPercent(share)} of project spend`}
+                  />
+                </span>
+                <span className="project-detail">
                   {`${project.requests} ${project.requests === 1 ? "request" : "requests"}, ${project.blockedRequests} blocked`}
                 </span>
               </li>
@@ -41,7 +49,7 @@ export function ProjectSpend(props: { projects: readonly ProjectUsage[] }) {
         </ol>
       )}
       {!anyTagged && (
-        <p className="muted">
+        <p className="quiet">
           No tagged requests this week. Send x-project on gateway requests to see spend by project.
         </p>
       )}

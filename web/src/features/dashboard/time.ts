@@ -1,6 +1,6 @@
 /**
- * Formats the report's instants and durations for the header: the reset time, the countdown to
- * it, and how fresh the data is. Budget periods are UTC, so every clock time here is too.
+ * Formats the report's instants and durations for the header: the week's dates, the reset time,
+ * the countdown to it, and how fresh the data is. Budget periods are UTC, so every clock time here is too.
  */
 
 const MINUTE_MS = 60_000;
@@ -26,6 +26,27 @@ const clockTime = new Intl.DateTimeFormat("en-GB", {
 /** An instant as a weekday and time in UTC: "Mon 00:00 UTC". */
 export function formatResetTime(at: string): string {
   return `${weekdayAndTime.format(new Date(at)).replace(",", "")} UTC`;
+}
+
+const dayOfMonth = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric" });
+const dayAndMonth = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  day: "numeric",
+  month: "short",
+});
+
+/**
+ * The seven UTC days of the week that resets at `weekResetsAt`: "16–22 Nov", or
+ * "30 Nov – 6 Dec" when it spans two months.
+ */
+export function formatWeekRange(weekResetsAt: string): string {
+  const resetsAt = Date.parse(weekResetsAt);
+  const firstDay = new Date(resetsAt - 7 * DAY_MS);
+  const lastDay = new Date(resetsAt - DAY_MS);
+  if (firstDay.getUTCMonth() === lastDay.getUTCMonth()) {
+    return `${dayOfMonth.format(firstDay)}–${dayAndMonth.format(lastDay)}`;
+  }
+  return `${dayAndMonth.format(firstDay)} – ${dayAndMonth.format(lastDay)}`;
 }
 
 /** An instant as a clock time in UTC: "14:02:10 UTC". */
