@@ -5,6 +5,9 @@
  * and limits so the view always agrees with the decisions the gateway made.
  */
 
+import { effectiveLimits } from "../budget/limits.ts";
+import { nextDayStart, nextWeekStart, weekStart } from "../budget/periods.ts";
+import { companySpendThisWeek, personalSpendToday, poolDrawsThisWeek } from "../budget/spend.ts";
 import type {
   Company,
   Employee,
@@ -61,5 +64,68 @@ export type UsageReportInput = {
  * @throws {Error} When an employee's tier isn't in `tiers`, which is a seed or programming error.
  */
 export function usageReport(input: UsageReportInput): UsageReport {
-  throw new Error("not implemented");
+  const { company, tiers, employees, usage, now } = input;
+  return {
+    asOf: now,
+    dayResetsAt: nextDayStart(now),
+    weekResetsAt: nextWeekStart(now),
+    company: {
+      id: company.id,
+      name: company.name,
+      spentThisWeekMicros: companySpendThisWeek(usage, company.id, now),
+      weeklyPoolMicros: company.weeklyPoolMicros,
+    },
+    employees: employees.map((employee) => employeeUsage(employee, tiers, usage, now)),
+  };
+}
+
+/**
+ * One employee's row, with limits resolved from their tier and overrides.
+ *
+ * @throws {Error} When the employee's tier isn't in `tiers`.
+ */
+function employeeUsage(
+  employee: Employee,
+  tiers: readonly Tier[],
+  usage: readonly UsageRecord[],
+  now: Date,
+): EmployeeUsage {
+  const limits = effectiveLimits(tierOf(employee, tiers), employee.overrides);
+  return {
+    employeeId: employee.id,
+    name: employee.name,
+    tierId: employee.tierId,
+    disabled: employee.disabled,
+    spentTodayMicros: personalSpendToday(usage, employee.id, now),
+    dailyAllowanceMicros: limits.dailyAllowanceMicros,
+    overflow: limits.overflow,
+    poolDrawsThisWeekMicros: poolDrawsThisWeek(usage, employee.id, now),
+    blockedThisWeek: blockedThisWeek(usage, employee.id, now),
+  };
+}
+
+/**
+ * The tier the employee belongs to.
+ *
+ * @throws {Error} When the tier isn't in `tiers`.
+ */
+function tierOf(employee: Employee, tiers: readonly Tier[]): Tier {
+  const tier = tiers.find((candidate) => candidate.id === employee.tierId);
+  if (tier) return tier;
+  throw new Error(
+    `Employee "${employee.id}" belongs to tier "${employee.tierId}", which doesn't exist. Add the tier to the seed or fix the employee's tierId.`,
+  );
+}
+
+/** How many of the employee's requests were blocked in the week containing `now`. */
+function blockedThisWeek(usage: readonly UsageRecord[], employeeId: string, now: Date): number {
+  const start = weekStart(now);
+  const end = nextWeekStart(now);
+  return usage.filter(
+    (record) =>
+      record.employeeId === employeeId &&
+      record.status === "blocked" &&
+      record.startedAt >= start &&
+      record.startedAt < end,
+  ).length;
 }
