@@ -1,62 +1,76 @@
 /**
- * Draws a horizontal bar as a row of SVG dots, the way rr's monitor draws usage. Usage bars color
- * each lit dot by where it sits (cyan under 60%, purple to 85%, pink past it); ranking bars are
- * cyan throughout. The aria-label carries the numbers, since the dots are decoration.
+ * Draws a horizontal bar as a row of SVG dots, the way rr's monitor draws usage. A usage bar takes
+ * one color from how full it is (cyan under 60%, purple to 85%, pink past it); a share bar is
+ * neutral, since a share isn't good or bad. The aria-label carries the numbers.
  */
 
-const CELLS = 40;
+/** How the lit dots are colored: by how full the bar is, or neutral for a share. */
+export type DotBarTone = "usage" | "share";
 
-/** How the lit dots are colored: by usage threshold, or one flat color for a ranking. */
-export type DotBarTone = "usage" | "rank";
+/** rr monitor's thresholds: info under 60%, sync from 60% to 85%, accent above. */
+export function usageSeverity(fraction: number): "info" | "sync" | "accent" {
+  if (fraction < 0.6) return "info";
+  if (fraction <= 0.85) return "sync";
+  return "accent";
+}
 
-function usageClass(position: number): string {
-  if (position < 0.6) return "dot-info";
-  if (position <= 0.85) return "dot-sync";
-  return "dot-accent";
+const clamp = (fraction: number) => Math.min(1, Math.max(0, fraction));
+
+function cellsFor(fraction: number, cells: number): number {
+  const lit = Math.round(clamp(fraction) * cells);
+  // A sliver of real spend still lights one dot, so nonzero never looks like zero.
+  return lit === 0 && fraction > 0 ? 1 : lit;
 }
 
 /**
- * A dot bar filled to `fraction` (clamped to 0..1), with an optional `marker` line at another
- * fraction, such as how far through the week we are.
+ * A dot bar filled to `fraction` (clamped to 0..1). `projected` dimly lights the dots from the
+ * fill to where spend is heading; `marker` draws a tick at another fraction, such as today.
  */
 export function DotBar(props: {
   fraction: number;
   label: string;
   tone: DotBarTone;
+  cells?: number;
+  projected?: number;
   marker?: number;
 }) {
-  const lit = Math.round(Math.min(1, Math.max(0, props.fraction)) * CELLS);
-  // A sliver of real spend still lights one dot, so nonzero never looks like zero.
-  const litCells = lit === 0 && props.fraction > 0 ? 1 : lit;
+  const cells = props.cells ?? 40;
+  const lit = cellsFor(props.fraction, cells);
+  const projectedTo = props.projected === undefined ? lit : cellsFor(props.projected, cells);
+  const litClass = props.tone === "share" ? "dot-share" : `dot-${usageSeverity(props.fraction)}`;
+  const projectedClass =
+    props.projected === undefined ? "" : `dot-${usageSeverity(props.projected)} dot-projected`;
+  const cellClass = (index: number) => {
+    if (index < lit) return litClass;
+    if (index < projectedTo) return projectedClass;
+    return "dot-empty";
+  };
   return (
     <svg
       role="img"
       aria-label={props.label}
-      viewBox={`0 0 ${CELLS * 2} 3`}
+      viewBox={`0 0 ${cells * 2} 4`}
       preserveAspectRatio="none"
       className="dot-bar"
     >
-      {Array.from({ length: CELLS }, (_, index) => {
-        const tone = props.tone === "usage" ? usageClass((index + 1) / CELLS) : "dot-info";
-        return (
-          <rect
-            // biome-ignore lint/suspicious/noArrayIndexKey: cells are positional and never reorder
-            key={index}
-            x={index * 2 + 0.2}
-            y={0.5}
-            width={1.6}
-            height={2}
-            rx={0.3}
-            className={index < litCells ? tone : "dot-empty"}
-          />
-        );
-      })}
+      {Array.from({ length: cells }, (_, index) => (
+        <rect
+          // biome-ignore lint/suspicious/noArrayIndexKey: cells are positional and never reorder
+          key={index}
+          x={index * 2 + 0.2}
+          y={0.75}
+          width={1.6}
+          height={2.5}
+          rx={0.3}
+          className={cellClass(index)}
+        />
+      ))}
       {props.marker !== undefined && (
         <rect
-          x={Math.min(1, Math.max(0, props.marker)) * CELLS * 2 - 0.15}
+          x={clamp(props.marker) * cells * 2 - 0.12}
           y={0}
-          width={0.3}
-          height={3}
+          width={0.24}
+          height={4}
           className="dot-marker"
         />
       )}

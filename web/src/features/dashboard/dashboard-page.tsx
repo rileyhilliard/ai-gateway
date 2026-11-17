@@ -10,12 +10,10 @@ import { useServices } from "../../app/services";
 import { ErrorState } from "../../components/error-state";
 import { DashboardHeader } from "./dashboard-header";
 import { DashboardSkeleton } from "./dashboard-skeleton";
-import { KpiStrip } from "./kpi-strip";
 import { NeedsAttention } from "./needs-attention";
 import { PeopleTable } from "./people-table";
 import { PoolPanel } from "./pool-panel";
 import { ProjectSpend } from "./project-spend";
-import { SpendRanking } from "./spend-ranking";
 
 /** The dashboard route at "/". */
 export function DashboardPage() {
@@ -48,13 +46,14 @@ function DashboardPanels(props: { report: UsageReport }) {
     <div className="dashboard-panels">
       {noUsageYet && <p className="hint">Send a request from http/gateway.http to see it here.</p>}
       <PoolPanel report={report} />
-      <KpiStrip report={report} />
-      <div className="panel-pair">
-        <SpendRanking report={report} />
+      <PeopleTable
+        employees={report.employees}
+        companySpentMicros={report.company.spentThisWeekMicros}
+      />
+      <div className="section-pair">
         <NeedsAttention employees={report.employees} />
+        <ProjectSpend projects={report.projects} />
       </div>
-      <PeopleTable employees={report.employees} />
-      <ProjectSpend projects={report.projects} />
     </div>
   );
 }

@@ -35,13 +35,13 @@ Derived on the client:
 
 ## Page, top to bottom
 
-1. Header. The company name, "Week resets Mon 00:00 UTC (in 2d 3h)", and a live indicator: a green dot with "Live, updated 2 s ago", amber "Stale since 14:02:10" after a failed poll, or red on an error. A brand gradient rule sits under the header.
-2. Pool panel. Spent and pool as large mono numbers, the percent used, and a bar of spend with a pace marker at the elapsed fraction of the week. Under the bar, a status line: "On pace: projected $X by Monday (Y% of pool)" in success green, or "Over pace: projected $X, Y% of the pool" in waiting amber, or error red when the pool is already spent.
-3. KPI strip, four tiles: spent this week; pool remaining; active people this week (`spentThisWeek > 0`) out of the total; blocked requests this week (the sum).
-4. Who's using the budget. Ranked horizontal bars of people by cost this week, each labelled with dollars and their share of this week's spend. Show the top 8 and fold the rest into "N others".
-5. People table. Name, tier, cost this week, a bar for allowance used today (with "x / y"), pool draws against the cap ("uncapped", or "blocks after allowance" on block tiers), blocked this week, and a status chip ("At limit", "Disabled" or nothing). Sorted by cost, highest first.
-6. Needs attention. People at their limit now, and people with blocked requests this week, each with the plain reason ("Blocked 3 times this week; their daily allowance is $0.01"). An empty state reads "Nobody is blocked this week."
-7. Projects. Ranked bars of spend by project, with "(no project)" for untagged and the request and blocked counts. The empty state reads: "No tagged requests this week. Send x-project on gateway requests to see spend by project."
+Only the pool hero sits on a panel. The other sections sit on the canvas under a sentence-case heading, separated by space and hairlines.
+
+1. Header. "Acme Corp / AI spend", then "Week of 16–22 Nov · resets Mon 00:00 UTC, in 2d 3h", and a live indicator: a green dot with "Live, updated 2 s ago", or amber "Stale since 14:02:10 UTC" after a failed poll. A 1 px brand gradient rule sits under the header.
+2. Pool hero. Spent as one large sans figure (tabular), "of $1.00" and the percent used. To the right, the pace status: a colored dot and a short title ("On pace" in success green, "Over pace" in waiting amber, "Pool spent" in error red, "Too early to project" muted) over one plain line ("projected $X by Monday, Y% of the pool"; for a spent pool, "every request is blocked until Mon 00:00 UTC"). The bar shows spend lit, the projection dimly lit from spend to where it's heading (capped at the bar's end, which is the pool), a tick at today labelled "Today, 37% of the week", "Projected $X" (or "Heading for $X" past the pool) above, and "$1.00 pool" at the end. Under a hairline: pool left, active people (`spentThisWeek > 0`) out of the total, and blocked requests this week.
+3. People, which is also the cost ranking. Sorted by cost, highest first. Columns: name, tier (muted), cost this week with an inline share bar and its percent of this week's spend, today's allowance as a bar and "x / y", pool draws against the cap ("uncapped"; block tiers get a quiet dash labelled "Blocks after allowance" for screen readers), blocked this week, and a status of a dot and text ("At limit", "Disabled" or nothing). Numbers are right-aligned mono with tabular figures. On a phone the table scrolls inside its own box with the name column pinned. When nobody has spent anything, a line above it says "Nobody has spent anything this week."
+4. Needs attention, beside Projects on wide screens. One line per person at their limit now or blocked this week: name, a short reason ("Daily allowance used, blocked until 00:00 UTC", "Pool cap reached", "Company pool ran out", "Ran past their $0.0100 daily allowance"), and "3 blocked". Empty, it's one quiet line: "Nobody is blocked this week."
+5. Spend by project. One row per project: name, request and blocked counts, the spend, and a share bar under it, with "(no project)" for untagged. The empty state reads: "No tagged requests this week. Send x-project on gateway requests to see spend by project."
 
 Money: micros become dollars. Show two decimals at $1 and up ($1,234.56). Below $1, show four decimals ($0.0110), since the demo amounts are fractions of a cent.
 
@@ -59,9 +59,9 @@ Read these, read-only: `src/styles/global.css` (the `@theme` tokens), `src/compo
 
 - Dark only, with `color-scheme: dark`. Canvas `#0a0a0f`, panel `#12121a`, line `#2a2a4a`, line-strong `#6a6a9a`. Ink `#ffffff`, ink-2 `#b4b4d0`, muted `#8a8aae`, and faint (decoration only).
 - Meaning colors: accent `#ff2e97`, info `#00ffff`, success `#39ff14`, waiting `#ffaa00`, error `#ff0055`, sync `#bf40ff`. Text on a neon fill is canvas-colored, never white.
-- Fonts: Instrument Sans Variable for prose and Martian Mono Variable for numbers, labels and chips, via `@fontsource-variable/*`.
-- Radii: 2 px chips, 4 px controls, 6 px panels. 1 px line borders. Focus ring: 2 px info outline.
-- Usage bars use the monitor's threshold colors (cyan under 60%, purple from 60% to 85%, pink above), drawn as an SVG dot grid like `Dots.tsx`, not the brand gradient. The brand gradient (`linear-gradient(90deg,#ff2e97,#bf40ff 35%,#00ffff 70%,#39ff14)`) is decoration only.
+- Fonts: Instrument Sans Variable for every word, headings included, and Martian Mono Variable (slightly condensed, tabular) for figures in the table and lists, via `@fontsource-variable/*`. The hero figure and its stat line are sans with tabular figures: mono at 52 px shouts.
+- Radii: 4 px controls, 6 px panels. 1 px line borders. Focus ring: 2 px info outline.
+- Usage bars take one color for the whole bar from the monitor's thresholds (cyan under 60%, purple from 60% to 85%, pink above), drawn as an SVG dot grid like `Dots.tsx`, not the brand gradient. Share bars (cost share, project share) are neutral ink-2: a share isn't good or bad. The brand gradient (`linear-gradient(90deg,#ff2e97,#bf40ff 35%,#00ffff 70%,#39ff14)`) is decoration only.
 - Plain CSS with tokens as custom properties (the stack's default: one stylesheet). No chart library: the bars are small SVGs.
 
 ## Dev experience

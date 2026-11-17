@@ -1,11 +1,11 @@
 /**
- * Checks the per-person rules: allowance used, at-limit for each overflow policy, the cost
- * ranking's fold into "N others", and the needs-attention reasons.
+ * Checks the per-person rules: allowance used, at-limit for each overflow policy, cost order, and
+ * the needs-attention reasons.
  */
 
 import { describe, expect, test } from "vitest";
 import type { EmployeeUsage } from "../../api/usage";
-import { allowanceUsed, isAtLimit, needsAttention, personStatus, rankSpenders } from "./people";
+import { allowanceUsed, byCostThenName, isAtLimit, needsAttention, personStatus } from "./people";
 
 function person(overrides: Partial<EmployeeUsage>): EmployeeUsage {
   return {
@@ -74,43 +74,15 @@ describe("at limit", () => {
   });
 });
 
-describe("cost ranking", () => {
-  test("ranks spenders by cost with their share, leaving out people who spent nothing", () => {
+describe("cost order", () => {
+  test("puts the highest cost this week first, then orders ties by name", () => {
     const people = [
       person({ name: "Low", spentThisWeekMicros: 25_000 }),
       person({ name: "Idle", spentThisWeekMicros: 0 }),
-      person({ name: "High", spentThisWeekMicros: 75_000 }),
+      person({ name: "Bea", spentThisWeekMicros: 75_000 }),
+      person({ name: "Ada", spentThisWeekMicros: 75_000 }),
     ];
-    expect(rankSpenders(people, 100_000)).toEqual([
-      { label: "High", spentThisWeekMicros: 75_000, share: 0.75 },
-      { label: "Low", spentThisWeekMicros: 25_000, share: 0.25 },
-    ]);
-  });
-
-  test("shows the top eight by name and folds the rest into 'N others'", () => {
-    const people = Array.from({ length: 10 }, (_, index) =>
-      person({ name: `P${index}`, spentThisWeekMicros: (index + 1) * 1_000 }),
-    );
-    const ranked = rankSpenders(people, 55_000);
-    expect(ranked.map((bar) => bar.label)).toEqual([
-      "P9",
-      "P8",
-      "P7",
-      "P6",
-      "P5",
-      "P4",
-      "P3",
-      "P2",
-      "2 others",
-    ]);
-    expect(ranked.at(-1)).toEqual({ label: "2 others", spentThisWeekMicros: 3_000, share: 3 / 55 });
-  });
-
-  test("a single folded person reads '1 other'", () => {
-    const people = Array.from({ length: 9 }, (_, index) =>
-      person({ name: `P${index}`, spentThisWeekMicros: 1_000 }),
-    );
-    expect(rankSpenders(people, 9_000).at(-1)?.label).toBe("1 other");
+    expect(byCostThenName(people).map((each) => each.name)).toEqual(["Ada", "Bea", "Low", "Idle"]);
   });
 });
 
@@ -134,32 +106,42 @@ describe("needs attention", () => {
       {
         employeeId: "a",
         name: "Ivy",
-        reasons: [
-          "Blocked 3 times this week; their daily allowance is $0.0100.",
-          "At their limit now: today's allowance is used, so requests are blocked until 00:00 UTC.",
-        ],
+        reason: "Daily allowance used, blocked until 00:00 UTC",
+        blockedThisWeek: 3,
       },
-      {
-        employeeId: "c",
-        name: "Sam",
-        reasons: [
-          "Blocked 2 times this week; their pool draws are uncapped, so the company pool ran out.",
-        ],
-      },
+      { employeeId: "c", name: "Sam", reason: "Company pool ran out", blockedThisWeek: 2 },
       {
         employeeId: "b",
         name: "Eli",
-        reasons: [
-          "Blocked once this week; their daily allowance is $0.0100 and their weekly pool cap is $0.0200.",
-        ],
+        reason: "Reached their $0.0200 weekly pool cap",
+        blockedThisWeek: 1,
       },
     ]);
   });
 
   test("lists someone at their limit who hasn't been blocked yet", () => {
     const atLimit = person({ name: "Ivy", spentTodayMicros: 10_000 });
-    expect(needsAttention([atLimit]).map((item) => item.reasons)).toEqual([
-      ["At their limit now: today's allowance is used, so requests are blocked until 00:00 UTC."],
+    expect(needsAttention([atLimit])).toEqual([
+      {
+        employeeId: "e",
+        name: "Ivy",
+        reason: "Daily allowance used, blocked until 00:00 UTC",
+        blockedThisWeek: 0,
+      },
+    ]);
+  });
+
+  test("names the cap reached for a capped pool tier, and the allowance for a block tier", () => {
+    const capReached = person({
+      name: "Eli",
+      overflow: capped,
+      spentTodayMicros: 10_000,
+      poolDrawsThisWeekMicros: 20_000,
+    });
+    const blockedEarlier = person({ name: "Ivy", blockedThisWeek: 1 });
+    expect(needsAttention([capReached, blockedEarlier]).map((item) => item.reason)).toEqual([
+      "Ran past their $0.0100 daily allowance",
+      "Pool cap reached",
     ]);
   });
 });

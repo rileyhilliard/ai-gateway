@@ -1,21 +1,19 @@
 /**
- * Placeholder panels shown until the first usage report arrives, shaped like the page so it
- * doesn't jump when the data lands.
+ * Placeholders shown until the first usage report arrives, shaped like the page (the pool hero,
+ * then table rows) so it doesn't jump when the data lands.
  */
 
-const PANEL_HEIGHTS = ["10rem", "5rem", "14rem", "18rem"];
+const ROW_COUNT = 5;
 
-/** The loading state: empty panels, announced once as "Loading usage". */
+/** The loading state: the page's outline, announced once as "Loading usage". */
 export function DashboardSkeleton() {
   return (
     <div role="status" aria-label="Loading usage" className="dashboard-skeleton">
-      {PANEL_HEIGHTS.map((height, index) => (
-        <div
-          // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholders that never reorder
-          key={index}
-          className="panel skeleton"
-          style={{ height }}
-        />
+      <div className="skeleton skeleton-title" />
+      <div className="panel skeleton skeleton-hero" />
+      {Array.from({ length: ROW_COUNT }, (_, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholders that never reorder
+        <div key={index} className="skeleton skeleton-row" />
       ))}
     </div>
   );
