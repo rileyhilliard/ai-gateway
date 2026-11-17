@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { UpstreamUnavailableError } from "../src/errors.ts";
 import { AnthropicErrorBody } from "../src/gateway/anthropic-errors.ts";
 import { createMemoryStore } from "../src/store/memory.ts";
+import { createOpenRouterUpstream } from "../src/upstream/openrouter.ts";
 import type { Upstream, UpstreamRequest } from "../src/upstream/types.ts";
 import { demoContents, jsonBody, testApp, testGateway } from "./helpers/app.ts";
 import { makeEmployee, makeRecord, NOW, usd } from "./helpers/fixtures.ts";
@@ -275,6 +276,45 @@ describe("upstream failures", () => {
         cause: { errorClass: "TypeError", message: "fetch failed" },
       }),
     ]);
+  });
+});
+
+describe("OpenRouter answers about the company account", () => {
+  const realModel = { ...message, model: "deepseek/deepseek-v4.1-flash-1017" };
+  /** The real OpenRouter upstream over a fetch that always answers `response`. */
+  const openRouterAnswering = (response: Response) =>
+    createOpenRouterUpstream({ apiKey: "sk-or-test", fetch: async () => response });
+
+  it("gives the employee a 502, not a 401 about their key, when the company key is rejected", async () => {
+    const openrouter = openRouterAnswering(
+      new Response(JSON.stringify({ error: { code: 401, message: "User not found." } }), {
+        status: 401,
+      }),
+    );
+    const { app, gateway, records } = testApp({ gateway: testGateway({ openrouter }) });
+    const res = await post(app, "key-staff", {}, realModel);
+    expect(res.status).toBe(502);
+    expect(await errorOf(res)).toMatchObject({ type: "api_error", code: "upstream_unavailable" });
+    expect(records.filter((record) => record.msg === "upstream unavailable")).toEqual([
+      expect.objectContaining({
+        level: "warn",
+        cause: {
+          errorClass: "Error",
+          message: "OpenRouter rejected the company key (401); check OPENROUTER_KEY.",
+        },
+      }),
+    ]);
+    expect(await recordsOf(gateway)).toEqual([]);
+  });
+
+  it("passes OpenRouter's retry-after through on a 429", async () => {
+    const openrouter = openRouterAnswering(
+      new Response("{}", { status: 429, headers: { "retry-after": "12" } }),
+    );
+    const { app } = testApp({ gateway: testGateway({ openrouter }) });
+    const res = await post(app, "key-staff", {}, realModel);
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBe("12");
   });
 });
 

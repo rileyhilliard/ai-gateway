@@ -78,6 +78,7 @@ export function messagesRoutes(deps: GatewayDeps, logger: Logger) {
       headers: {
         "content-type": isText ? "text/plain; charset=utf-8" : "application/json",
         "x-request-id": requestId,
+        ...(upstream.retryAfter ? { "retry-after": upstream.retryAfter } : {}),
       },
     });
   });

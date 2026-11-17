@@ -74,8 +74,9 @@ function readCostMicros(usage: Record<string, unknown> | null): Micros | null {
  * An upstream that sends each request to OpenRouter. A missing key fails per request.
  *
  * @throws {UpstreamUnavailableError} From `send` and `stream`, when there is no API key, the
- * fetch or a full body read fails, or the provider takes longer than `timeoutMs` (for `stream`,
- * to start answering). The original failure is the `cause`.
+ * fetch or a full body read fails, the provider takes longer than `timeoutMs` (for `stream`,
+ * to start answering), or OpenRouter refuses the company key or account (401, 402). The
+ * original failure, or what to fix, is the `cause`.
  */
 export function createOpenRouterUpstream(options: OpenRouterOptions): Upstream {
   const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
@@ -131,9 +132,24 @@ function isEventStream(response: Response): boolean {
 }
 
 /**
- * Reads the whole body and its usage.
+ * Why OpenRouter refused the company's account, for statuses that are the company's problem
+ * rather than the employee's. Passed through, Claude Code would report a 401 as the employee's
+ * key being bad. 403 isn't here: OpenRouter uses it for input its moderation flagged.
+ */
+const ACCOUNT_ERRORS = new Map([
+  [401, "OpenRouter rejected the company key (401); check OPENROUTER_KEY."],
+  [402, "OpenRouter account is out of credits (402); add credits on openrouter.ai."],
+]);
+
+// Statuses where the provider asks clients to back off; Anthropic SDKs honor retry-after.
+const RETRY_AFTER_STATUSES = new Set([429, 529]);
+
+/**
+ * Reads the whole body and its usage. The body is read even for an account error, so the
+ * connection is released before the error is thrown.
  *
- * @throws {UpstreamUnavailableError} When the connection drops or times out while reading.
+ * @throws {UpstreamUnavailableError} When the connection drops or times out while reading, or
+ * OpenRouter refuses the company account (401, 402); the cause says which and what to fix.
  */
 async function readFullResponse(response: Response): Promise<UpstreamResponse> {
   let text: string;
@@ -142,12 +158,17 @@ async function readFullResponse(response: Response): Promise<UpstreamResponse> {
   } catch (cause) {
     throw new UpstreamUnavailableError(cause);
   }
+  const accountError = ACCOUNT_ERRORS.get(response.status);
+  if (accountError) throw new UpstreamUnavailableError(new Error(accountError));
+
   const parsedBody = parseBody(text);
   const usage = usageObjectOf(parsedBody);
+  const retryAfter = response.headers.get("retry-after");
   return {
     status: response.status,
     body: parsedBody,
     usage: readTokenUsage(usage),
     costMicros: readCostMicros(usage),
+    ...(RETRY_AFTER_STATUSES.has(response.status) && retryAfter !== null ? { retryAfter } : {}),
   };
 }

@@ -11,12 +11,14 @@ export type UpstreamRequest = { body: unknown; headers: Record<string, string> }
 /**
  * The provider's answer. `usage` is null when the provider reported no token counts.
  * `costMicros` is the provider's own reported cost (OpenRouter's `usage.cost`), or null.
+ * `retryAfter` is the provider's `retry-after` header on a 429 or 529, for the client to honor.
  */
 export type UpstreamResponse = {
   status: number;
   body: unknown;
   usage: TokenUsage | null;
   costMicros: Micros | null;
+  retryAfter?: string;
 };
 
 /**

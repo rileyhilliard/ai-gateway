@@ -60,7 +60,7 @@ export type StreamSettlement = { end: StreamEnd; recording: RecordingOutcome };
  * ends, after the response has started, so `settled` resolves then; it never rejects.
  */
 export type MessageResponse =
-  | { kind: "json"; status: number; body: unknown }
+  | { kind: "json"; status: number; body: unknown; retryAfter?: string }
   | {
       kind: "stream";
       status: number;
@@ -137,7 +137,8 @@ export async function handleMessage(
     response.usage ? { usage: response.usage, costMicros: response.costMicros } : null,
   );
   if (record) await store.addUsage(record);
-  return { kind: "json", status: response.status, body: response.body };
+  const { status, body: responseBody, retryAfter } = response;
+  return { kind: "json", status, body: responseBody, ...(retryAfter ? { retryAfter } : {}) };
 }
 
 /** Writes the record, reporting a store failure as a value with the record that was lost. */
